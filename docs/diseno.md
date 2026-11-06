@@ -1,7 +1,7 @@
 # Diseño de la solución — SoporteTI
 
-**Versión:** 1.1  
-**Estado:** Diseño técnico propuesto  
+**Versión:** 1.2  
+**Estado:** Diseño técnico actualizado  
 **Proyecto:** SoporteTI  
 **Asignatura:** Aplicaciones y Servicios Web
 
@@ -35,7 +35,7 @@ Se utilizará una arquitectura cliente-servidor organizada en tres capas:
 - **Backend:** API desarrollada con Python y FastAPI.
 - **Base de datos:** PostgreSQL administrado por Supabase.
 - **Almacenamiento:** Supabase Storage para archivos adjuntos y evidencias.
-- **Comunicación:** API REST para las operaciones del sistema. Se contempla WebSocket para la actualización de conversaciones en tiempo real.
+- **Comunicación:** API REST para las operaciones del sistema. Se contempla incorporar WebSockets en una etapa posterior para actualizar conversaciones en tiempo real.
 - **Notificaciones:** servicio de correo electrónico para enviar avisos a los usuarios cuando corresponda.
 
 ### 3.2. Diagrama de arquitectura
@@ -51,7 +51,6 @@ flowchart TD
 
     U --> F
     F -->|"HTTPS / API REST"| A
-    F <-->|"WebSocket opcional"| A
     A -->|"SQLAlchemy"| D
     A -->|"Gestión de archivos"| S
     A -->|"Notificaciones"| E
@@ -126,7 +125,7 @@ Se utilizará FastAPI para exponer los endpoints que consumirá el frontend.
 **Conversaciones**
 - Envío y consulta de mensajes.
 - Asociación de mensajes con una solicitud.
-- Comunicación entre solicitantes y personal autorizado.
+- Comunicación entre solicitantes, técnicos asignados y coordinadores.
 - Restricción de nuevos mensajes cuando una solicitud se encuentre cerrada.
 
 **Categorías**
@@ -142,6 +141,7 @@ Se utilizará FastAPI para exponer los endpoints que consumirá el frontend.
 - Consulta de solicitudes por prioridad.
 - Estadísticas de atención.
 - Indicadores generales para el coordinador.
+- Diferenciación entre solicitudes cerradas por solución y por cancelación.
 
 **Historial**
 - Registro de cambios relevantes.
@@ -174,7 +174,7 @@ Se utilizará el prefijo `/api/v1` para identificar la primera versión de la AP
 | POST | `/api/v1/requests/{id}/messages` | Enviar mensaje |
 | POST | `/api/v1/requests/{id}/resolve` | Registrar solución |
 | POST | `/api/v1/requests/{id}/close` | Cerrar solicitud |
-| POST | `/api/v1/requests/{id}/cancel` | Cancelar solicitud, si está permitido |
+| POST | `/api/v1/requests/{id}/cancel` | Cancelar solicitud |
 | GET | `/api/v1/requests/{id}/history` | Consultar historial |
 | GET | `/api/v1/categories` | Consultar categorías |
 | POST | `/api/v1/categories` | Crear categoría |
@@ -184,9 +184,7 @@ Los endpoints definitivos se ajustarán durante la implementación. Las operacio
 
 ### 5.3. Respuestas y manejo de errores
 
-La API utilizará códigos HTTP adecuados para indicar el resultado de cada operación.
-
-Se contemplan principalmente:
+La API utilizará códigos HTTP adecuados para indicar el resultado de cada operación:
 
 - `200`: operación realizada correctamente.
 - `201`: recurso creado.
@@ -199,7 +197,7 @@ Se contemplan principalmente:
 - `422`: datos que no cumplen las validaciones.
 - `500`: error interno del servidor.
 
-Las respuestas de error tendrán una estructura consistente y no expondrán información interna, contraseñas, tokens ni detalles sensibles.
+Las respuestas de error tendrán una estructura consistente y no expondrán información interna ni datos sensibles.
 
 ### 5.4. Paginación y filtros
 
@@ -214,6 +212,7 @@ Se podrán implementar filtros por:
 - Solicitante.
 - Fecha de creación.
 - Fecha de cierre.
+- Tipo de cierre.
 
 La API deberá validar los parámetros de paginación y limitar la cantidad máxima de registros devueltos.
 
@@ -272,6 +271,8 @@ Campos propuestos:
 - `prioridad`: nivel de prioridad.
 - `estado`: estado actual.
 - `medio_contacto`: medio de contacto seleccionado.
+- `tipo_cierre`: solución o cancelación, cuando corresponda.
+- `motivo_cierre`: explicación del cierre o cancelación.
 - `fecha_creacion`: fecha de registro.
 - `fecha_actualizacion`: última modificación.
 - `fecha_cierre`: fecha de cierre, cuando corresponda.
@@ -279,6 +280,8 @@ Campos propuestos:
 - `solucion_final`: resumen de la solución definitiva, cuando exista.
 
 El técnico responsable se obtendrá de la tabla de asignaciones activas, evitando mantener el mismo dato duplicado en dos tablas.
+
+El campo `tipo_cierre` permitirá diferenciar una solicitud cerrada después de una atención de otra que fue cancelada.
 
 #### 6.1.4. asignaciones
 
@@ -308,7 +311,7 @@ Campos propuestos:
 - `contenido`: contenido del mensaje.
 - `fecha_envio`: fecha y hora de envío.
 
-Los mensajes pertenecerán a la conversación de la solicitud y podrán ser consultados por los participantes autorizados.
+Los mensajes pertenecerán a la conversación de la solicitud y podrán ser consultados por el solicitante, el técnico asignado y el coordinador, según sus permisos.
 
 #### 6.1.6. intervenciones
 
@@ -343,7 +346,7 @@ Campos propuestos:
 - `observacion`: descripción adicional.
 - `fecha_cambio`: fecha y hora del cambio.
 
-Se utilizará para registrar cambios de estado, prioridad, categoría, asignaciones y otras modificaciones relevantes.
+Se utilizará para registrar cambios de estado, prioridad, categoría, asignaciones, cierres y cancelaciones.
 
 La tabla de asignaciones conservará el detalle de cada asignación; el historial general permitirá consultar los cambios como parte de la evolución de la solicitud.
 
@@ -423,7 +426,7 @@ Se establecerán restricciones para garantizar la consistencia de la informació
 
 - El correo electrónico de cada usuario será único.
 - Los roles estarán limitados a solicitante, técnico y coordinador.
-- Los estados y prioridades utilizarán valores controlados.
+- Los estados, prioridades y tipos de cierre utilizarán valores controlados.
 - Las solicitudes deberán tener un solicitante válido.
 - Las asignaciones solo podrán asociar técnicos activos.
 - Una solicitud no podrá tener más de una asignación activa.
@@ -432,6 +435,8 @@ Se establecerán restricciones para garantizar la consistencia de la informació
 - Los archivos adjuntos deberán tener una asociación válida.
 - Los registros históricos no se modificarán desde las operaciones normales de la aplicación.
 - Las solicitudes cerradas no admitirán nuevas operaciones de atención.
+- Una solicitud con estado `Cerrado` deberá tener un tipo de cierre y una fecha de cierre.
+- El tipo de cierre deberá distinguir entre solución y cancelación.
 
 Las reglas que involucren varias tablas se validarán mediante transacciones y lógica de negocio en el backend, utilizando restricciones adicionales cuando sea posible.
 
@@ -449,39 +454,46 @@ Se contemplan los siguientes estados:
 | En atención | El técnico está trabajando en el caso |
 | En espera | La atención está pendiente de información u otra condición |
 | Resuelto | El técnico ha registrado una solución para revisión |
-| Cerrado | Solicitud finalizada por el coordinador |
-| Cancelado | Solicitud cancelada según las reglas permitidas |
+| Cerrado | Solicitud finalizada o cancelada |
+
+La cancelación no será un estado independiente. Se representará mediante el estado `Cerrado` y el tipo de cierre `Cancelación`.
 
 ### 7.1. Reglas de transición
 
 - Una solicitud nueva inicia en `Registrado`.
 - El coordinador puede pasarla a `En evaluación`.
 - El coordinador puede asignarla a un técnico.
-- El técnico puede avanzar la atención y solicitar información.
-- El técnico puede registrar una solución y dejar la solicitud en `Resuelto`.
+- El técnico asignado puede avanzar la atención y solicitar información.
+- El técnico asignado puede registrar una solución y dejar la solicitud en `Resuelto`.
 - El coordinador revisa la solución y puede cerrar la solicitud.
 - Si la solución no es satisfactoria, el coordinador puede devolverla a atención.
 - El solicitante puede cancelar la solicitud únicamente en los estados permitidos por los requisitos.
+- Cuando el solicitante cancela, el estado pasa a `Cerrado` y el tipo de cierre queda registrado como `Cancelación`.
+- El cierre por solución tendrá el tipo de cierre `Solución`.
 - Una solicitud cerrada no puede reabrirse.
-- Una solicitud cancelada no podrá continuar su atención.
+- Si aparece un nuevo problema, se debe crear otra solicitud.
 
-### 7.2. Matriz de transiciones propuesta
+### 7.2. Matriz de transiciones
 
 | Estado actual | Estado destino | Responsable |
 |---|---|---|
 | Registrado | En evaluación | Coordinador |
-| Registrado | Cancelado | Solicitante, si está permitido |
+| Registrado | Cerrado (cancelación) | Solicitante |
 | En evaluación | Asignado | Coordinador |
-| En evaluación | Cancelado | Solicitante, si está permitido |
-| En evaluación | Cerrado | Coordinador, en casos justificados |
+| En evaluación | Cerrado (cancelación) | Solicitante |
+| En evaluación | Cerrado (no procedente o duplicado) | Coordinador |
 | Asignado | En atención | Técnico asignado |
 | En atención | En espera | Técnico asignado |
 | En espera | En atención | Técnico asignado |
 | En atención | Resuelto | Técnico asignado |
 | Resuelto | En atención | Coordinador |
-| Resuelto | Cerrado | Coordinador |
+| Resuelto | Cerrado (solución) | Coordinador |
 
-La matriz definitiva deberá coincidir con las reglas de negocio aprobadas en `docs/requisitos.md`. No se permitirá ninguna transición que no esté expresamente autorizada.
+La cancelación por parte del solicitante estará permitida únicamente en `Registrado` y `En evaluación`, conforme a las reglas de negocio.
+
+El cierre por parte del coordinador deberá registrar el tipo de cierre y la justificación correspondiente.
+
+No se permitirá ninguna transición que no esté expresamente autorizada.
 
 ## 8. Diseño de la interfaz
 
@@ -498,7 +510,7 @@ El solicitante tendrá acceso a:
 - Listado de sus solicitudes.
 - Consulta del estado de cada solicitud.
 - Detalle de la solicitud.
-- Conversación con el personal de soporte.
+- Conversación con el técnico asignado y el coordinador.
 - Consulta de intervenciones visibles.
 - Consulta del historial permitido.
 - Consulta de notificaciones.
@@ -509,9 +521,9 @@ El técnico tendrá acceso a:
 
 - Panel de trabajo.
 - Listado de solicitudes asignadas.
-- Detalle de las solicitudes.
+- Detalle de las solicitudes asignadas.
 - Registro de intervenciones.
-- Comunicación con los solicitantes.
+- Comunicación con los solicitantes de sus solicitudes asignadas.
 - Solicitud de información adicional.
 - Registro de diagnósticos y soluciones.
 
@@ -530,6 +542,7 @@ El coordinador tendrá acceso a:
 - Administración de categorías.
 - Consulta de estadísticas.
 - Consulta del historial de atención.
+- Participación en las conversaciones de las solicitudes.
 
 ## 9. Autenticación y autorización
 
@@ -580,11 +593,13 @@ Cada endpoint verificará el rol del usuario y, cuando corresponda, su relación
 Reglas principales:
 
 - El solicitante solo podrá consultar y gestionar sus propias solicitudes dentro de los permisos establecidos.
-- El técnico solo podrá consultar y atender solicitudes asignadas.
+- El técnico solo podrá consultar y atender solicitudes que tenga asignadas.
 - El coordinador podrá consultar y administrar todas las solicitudes.
-- Solamente el coordinador podrá cerrar solicitudes.
+- Solamente el coordinador podrá cerrar solicitudes por solución o por causas administrativas.
+- El solicitante podrá cancelar en los estados permitidos.
 - Ningún usuario podrá enviar mensajes o registrar intervenciones en solicitudes cerradas.
 - Los datos internos de una intervención no serán visibles para el solicitante.
+- El técnico que deje de tener asignada una solicitud perderá el acceso operativo a su conversación, salvo los permisos adicionales que se definan para auditoría.
 
 Ocultar botones en el frontend no será considerado una medida de seguridad suficiente. Los permisos deberán comprobarse en el backend.
 
@@ -647,16 +662,18 @@ Los archivos adjuntos se almacenarán en Supabase Storage utilizando buckets pri
 
 La base de datos conservará los metadatos y la ubicación de los archivos, no su contenido binario.
 
-Se establecerán las siguientes reglas:
+Se aplicarán las mismas restricciones a los archivos adjuntos de solicitudes, mensajes e intervenciones:
 
-- Validación de extensiones y tipos MIME.
-- Restricción de tamaño.
+- Formatos permitidos: PNG y JPG.
+- Tamaño máximo: 5 MB por archivo.
+- Validación de extensión y tipo MIME.
+- Verificación del contenido real del archivo.
 - Nombres de almacenamiento únicos.
 - Verificación de permisos antes de subir o descargar archivos.
 - Acceso mediante el backend o enlaces temporales autorizados.
 - Asociación de cada archivo con una solicitud y, cuando corresponda, con un mensaje o intervención.
 
-Los formatos y límites definitivos deberán coincidir con los requisitos establecidos. Inicialmente se conservará la restricción definida para los adjuntos de solicitudes: PNG y JPG, con un tamaño máximo de 5 MB. Se deberá decidir expresamente si los mensajes e intervenciones utilizarán las mismas restricciones.
+Los archivos se almacenarán en un bucket privado. No se habilitará el acceso público directo a los adjuntos.
 
 ## 12. Comunicación y notificaciones
 
@@ -667,12 +684,14 @@ Se diferenciarán tres mecanismos.
 ### 12.1. Conversación
 
 - Mensajes entre el solicitante y el personal autorizado.
+- El solicitante podrá conversar con el técnico asignado y el coordinador.
+- El técnico podrá conversar únicamente en las solicitudes que tenga asignadas.
+- El coordinador podrá consultar y participar en las conversaciones de todas las solicitudes.
 - Disponible durante toda la atención de una solicitud abierta.
 - El solicitante podrá enviar mensajes incluso cuando la solicitud esté en espera.
 - Enviar un mensaje no cambiará automáticamente el estado.
 - La conversación se bloqueará cuando la solicitud esté cerrada.
 - El historial de mensajes permanecerá disponible para consulta.
-- El técnico tendrá acceso a la conversación únicamente cuando esté autorizado para atender la solicitud.
 
 ### 12.2. Intervenciones técnicas
 
@@ -691,11 +710,16 @@ Los eventos y preferencias definitivos de notificación se establecerán durante
 
 ### 12.4. Actualización de conversaciones
 
-Inicialmente se podrá implementar el envío y consulta de mensajes mediante API REST.
+La primera versión utilizará API REST para:
 
-Se contempla WebSocket con FastAPI para actualizar las conversaciones en tiempo real, siempre que la implementación lo justifique.
+- Enviar mensajes.
+- Consultar conversaciones.
+- Recuperar mensajes anteriores.
+- Actualizar la vista de conversación mediante consultas periódicas, si es necesario.
 
-La comunicación en tiempo real no reemplazará el almacenamiento persistente de mensajes en PostgreSQL.
+En una etapa posterior se podrá incorporar WebSocket con FastAPI para recibir mensajes en tiempo real.
+
+La incorporación de WebSockets no modificará el modelo de almacenamiento: los mensajes continuarán guardándose en PostgreSQL y podrán recuperarse mediante la API REST.
 
 ## 13. Historial y auditoría
 
@@ -709,7 +733,9 @@ Se registrarán, como mínimo:
 - Cambios de categoría.
 - Asignaciones y reasignaciones.
 - Registro de soluciones.
-- Cierre o cancelación.
+- Cierre por solución.
+- Cancelación por parte del solicitante.
+- Cierre administrativo por parte del coordinador.
 - Modificaciones administrativas relevantes.
 
 Cada registro incluirá el usuario responsable y la fecha de la operación.
@@ -717,6 +743,8 @@ Cada registro incluirá el usuario responsable y la fecha de la operación.
 Los registros históricos no podrán ser modificados desde las funcionalidades normales de la aplicación.
 
 Los mensajes y las intervenciones conservarán sus propias entidades y no serán sustituidos por el historial de cambios.
+
+La cancelación y el cierre por solución deberán poder distinguirse al consultar el historial y las estadísticas.
 
 ## 14. Seguridad y protección de datos
 
@@ -748,7 +776,8 @@ Por ejemplo:
 - Asignar un técnico y registrar el cambio en el historial.
 - Cambiar el estado y registrar la transición.
 - Registrar una solución y actualizar el estado correspondiente.
-- Cerrar una solicitud y conservar el responsable y la fecha de cierre.
+- Cerrar una solicitud y conservar el responsable, tipo y fecha de cierre.
+- Cancelar una solicitud y registrar el motivo de cancelación.
 
 Se implementarán controles para evitar inconsistencias cuando dos usuarios intenten modificar simultáneamente una solicitud.
 
@@ -833,6 +862,8 @@ Se realizarán pruebas durante el desarrollo y al finalizar la integración.
 - Funciones de los servicios.
 - Reglas de asignación.
 - Validación de solicitudes cerradas.
+- Diferenciación entre cierre por solución y cancelación.
+- Validación de archivos adjuntos.
 
 ### 17.2. Pruebas de integración
 
@@ -843,6 +874,7 @@ Se realizarán pruebas durante el desarrollo y al finalizar la integración.
 - Gestión de archivos.
 - Gestión de sesiones.
 - Registro de cambios en el historial.
+- Restricciones de acceso a conversaciones.
 
 ### 17.3. Pruebas funcionales
 
@@ -850,11 +882,13 @@ Se realizarán pruebas durante el desarrollo y al finalizar la integración.
 - Creación de cuentas por el coordinador.
 - Registro de solicitudes.
 - Atención de solicitudes.
-- Comunicación entre usuarios.
+- Comunicación entre usuarios autorizados.
 - Registro de intervenciones.
-- Cierre de solicitudes.
+- Cancelación por parte del solicitante.
+- Cierre por parte del coordinador.
 - Restricciones según el rol.
 - Consulta de estadísticas.
+- Bloqueo de operaciones en solicitudes cerradas.
 
 Los resultados se documentarán en `docs/pruebas.md`.
 
@@ -872,11 +906,12 @@ El proyecto se desarrollará de manera incremental, implementando y probando cad
 | 6 | Categorías y registro de solicitudes |
 | 7 | Asignaciones y gestión de estados |
 | 8 | Intervenciones técnicas e historial |
-| 9 | Conversación y notificaciones |
+| 9 | Conversación REST y notificaciones |
 | 10 | Desarrollo de interfaces por rol |
 | 11 | Integración entre frontend y backend |
 | 12 | Pruebas funcionales y corrección de errores |
-| 13 | Documentación, evidencias y preparación de la presentación |
+| 13 | Evaluación e incorporación posterior de WebSockets, si corresponde |
+| 14 | Documentación, evidencias y preparación de la presentación |
 
 Durante todo el desarrollo se utilizará Git y GitHub para registrar los cambios, conservar versiones funcionales y documentar el avance.
 
@@ -885,16 +920,14 @@ Durante todo el desarrollo se utilizará Git y GitHub para registrar los cambios
 Las siguientes decisiones se concretarán antes o durante la implementación:
 
 1. Definición definitiva de los estados y transiciones, de acuerdo con `docs/requisitos.md`.
-2. Definición de los permisos de conversación entre solicitantes, técnicos y coordinadores.
-3. Definición de los formatos y tamaños permitidos para adjuntos en mensajes e intervenciones.
-4. Selección del mecanismo definitivo de sesiones y revocación.
-5. Configuración de la conexión y el pool de PostgreSQL.
-6. Configuración de los buckets privados de Storage.
-7. Definición de los eventos de notificación por correo.
-8. Decisión sobre la implementación de WebSockets.
-9. Definición de políticas RLS, si se utilizan.
-10. Selección del proveedor de despliegue para frontend y backend.
-11. Definición de las políticas de respaldo y recuperación.
+2. Definición de los eventos de notificación por correo.
+3. Selección del mecanismo definitivo de sesiones y revocación.
+4. Configuración de la conexión y el pool de PostgreSQL.
+5. Configuración de los buckets privados de Storage.
+6. Definición de políticas RLS, si se utilizan.
+7. Selección del proveedor de despliegue para frontend y backend.
+8. Definición de las políticas de respaldo y recuperación.
+9. Evaluación de WebSockets para una versión posterior.
 
 Las decisiones que afecten los requisitos deberán documentarse y, si corresponde, reflejarse también en `docs/requisitos.md`.
 
