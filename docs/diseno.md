@@ -1,6 +1,6 @@
 # Diseño de la solución — SoporteTI
 
-**Versión:** 1.2  
+**Versión:** 1.3  
 **Estado:** Diseño técnico actualizado  
 **Proyecto:** SoporteTI  
 **Asignatura:** Aplicaciones y Servicios Web
@@ -63,7 +63,7 @@ flowchart TD
 3. Las operaciones se envían al backend mediante solicitudes HTTP.
 4. FastAPI valida la sesión, los permisos y las reglas de negocio.
 5. El backend consulta o modifica la información en PostgreSQL.
-6. Cuando se requiere almacenar un archivo, el backend gestiona su almacenamiento en Supabase Storage.
+6. Cuando se requiere almacenar un archivo, el frontend prepara la imagen y FastAPI valida y gestiona su almacenamiento en Supabase Storage.
 7. El resultado de cada operación se devuelve al frontend.
 
 El frontend no realizará consultas directas a las tablas de la aplicación ni tendrá acceso a credenciales administrativas de Supabase.
@@ -362,11 +362,15 @@ Campos propuestos:
 - `intervencion_id`: intervención asociada, si corresponde.
 - `nombre_archivo`: nombre original del archivo.
 - `ruta_storage`: ubicación del archivo en Supabase Storage.
-- `tipo_archivo`: formato del archivo.
-- `tamano`: tamaño en bytes.
+- `tipo_archivo`: formato del archivo almacenado.
+- `tamano`: tamaño del archivo almacenado en bytes.
 - `fecha_subida`: fecha y hora de subida.
 
 Cada adjunto deberá estar asociado a una solicitud y, opcionalmente, a un mensaje o intervención. Se establecerán restricciones para evitar asociaciones ambiguas.
+
+El archivo físico se almacenará en Supabase Storage. PostgreSQL conservará únicamente sus metadatos y su ruta, no el contenido binario.
+
+Las imágenes originales podrán recibirse en PNG o JPG, pero se convertirán a WebP antes de su almacenamiento. Por tanto, `tipo_archivo` y `tamano` representarán el archivo final almacenado.
 
 #### 6.1.9. notificaciones
 
@@ -481,8 +485,6 @@ La cancelación no será un estado independiente. Se representará mediante el e
 | Registrado | Cerrado (cancelación) | Solicitante |
 | En evaluación | Asignado | Coordinador |
 | En evaluación | Cerrado (cancelación) | Solicitante |
-| En evaluación | Cerrado (no procedente o duplicado) | Coordinador |
-| Asignado | En atención | Técnico asignado |
 | En atención | En espera | Técnico asignado |
 | En espera | En atención | Técnico asignado |
 | En atención | Resuelto | Técnico asignado |
@@ -631,7 +633,7 @@ Se configurará una conexión segura mediante SSL y un pool de conexiones adecua
 - Autorización por roles.
 - Reglas de negocio.
 - Consultas y transacciones.
-- Gestión de archivos.
+- Gestión y validación de archivos.
 - Notificaciones.
 
 ### 10.3. Protección de credenciales
@@ -656,24 +658,101 @@ Se establecerán permisos mínimos necesarios para las operaciones de la aplicac
 
 Si se utiliza Row Level Security (RLS), se definirán las políticas correspondientes y el contexto de usuario que se utilizará en cada consulta. No se asumirá que RLS protege automáticamente las operaciones realizadas mediante una conexión administrativa del backend.
 
-## 11. Almacenamiento de archivos
+## 11. Almacenamiento de archivos e imágenes
 
 Los archivos adjuntos se almacenarán en Supabase Storage utilizando buckets privados.
 
 La base de datos conservará los metadatos y la ubicación de los archivos, no su contenido binario.
 
-Se aplicarán las mismas restricciones a los archivos adjuntos de solicitudes, mensajes e intervenciones:
+Se aplicarán las mismas restricciones a los archivos adjuntos de solicitudes, mensajes e intervenciones.
 
-- Formatos permitidos: PNG y JPG.
-- Tamaño máximo: 5 MB por archivo.
-- Validación de extensión y tipo MIME.
-- Verificación del contenido real del archivo.
-- Nombres de almacenamiento únicos.
-- Verificación de permisos antes de subir o descargar archivos.
-- Acceso mediante el backend o enlaces temporales autorizados.
-- Asociación de cada archivo con una solicitud y, cuando corresponda, con un mensaje o intervención.
+### 11.1. Formatos y restricciones
 
-Los archivos se almacenarán en un bucket privado. No se habilitará el acceso público directo a los adjuntos.
+Para las imágenes adjuntas se establecerán las siguientes condiciones:
+
+- Formatos de entrada permitidos: PNG y JPG/JPEG.
+- Tamaño máximo del archivo original: 5 MB por imagen.
+- Formato final de almacenamiento: WebP.
+- Calidad de conversión recomendada: entre 80 % y 85 %.
+- Dimensión máxima: 1920 píxeles en el lado mayor.
+- Se conservará la proporción original de la imagen.
+- No se aumentará artificialmente la resolución de imágenes pequeñas.
+
+La compresión deberá mantener una calidad visual suficiente para que las evidencias técnicas, textos, etiquetas y detalles relevantes puedan consultarse.
+
+### 11.2. Conversión de imágenes
+
+La conversión se realizará en el frontend antes de enviar el archivo al backend.
+
+El procedimiento será:
+
+1. El usuario selecciona una imagen PNG o JPG.
+2. El frontend comprueba que el formato y el tamaño original sean permitidos.
+3. La imagen se procesa y se convierte a WebP.
+4. Si supera los 1920 píxeles en su lado mayor, se redimensiona conservando su proporción.
+5. Se aplica una calidad de compresión aproximada del 80 % al 85 %.
+6. El archivo convertido se envía al backend mediante la API.
+7. FastAPI realiza las validaciones correspondientes antes de almacenarlo.
+
+La conversión en el navegador busca reducir el tamaño de los archivos enviados y el espacio utilizado en Storage. Sin embargo, no reemplaza las validaciones del backend.
+
+### 11.3. Validaciones del backend
+
+FastAPI será responsable de validar nuevamente cada archivo recibido.
+
+Se comprobará:
+
+- Que el contenido corresponda realmente a una imagen válida.
+- Que el formato final sea WebP.
+- Que el tamaño final no supere el límite establecido para el almacenamiento.
+- Que las dimensiones sean válidas.
+- Que el archivo no esté corrupto.
+- Que el usuario tenga permiso para adjuntarlo a la solicitud, mensaje o intervención correspondiente.
+
+No se confiará exclusivamente en la extensión del archivo ni en el tipo MIME declarado por el frontend.
+
+Se utilizarán nombres únicos para los archivos almacenados, evitando sobrescribir archivos existentes.
+
+### 11.4. Almacenamiento y acceso
+
+Los archivos se guardarán en un bucket privado de Supabase Storage.
+
+No se habilitará el acceso público directo a los adjuntos.
+
+El acceso a los archivos se realizará mediante FastAPI o enlaces temporales autorizados, después de comprobar los permisos del usuario.
+
+La ruta de almacenamiento y los metadatos del archivo se registrarán en PostgreSQL.
+
+La estructura de almacenamiento podrá organizarse por solicitud, por ejemplo:
+
+```text
+adjuntos/
+└── solicitudes/
+    └── {solicitud_id}/
+        ├── {archivo_uuid}.webp
+        └── {archivo_uuid}.webp
+```
+
+La ruta será única y no dependerá del nombre original proporcionado por el usuario.
+
+### 11.5. Conservación y eliminación de archivos
+
+El cierre de sesión de un usuario no provocará la eliminación de sus archivos adjuntos.
+
+De igual manera, cerrar una solicitud no eliminará las imágenes ni los documentos asociados.
+
+Los archivos se conservarán como parte del historial y de las evidencias de atención de la solicitud, incluso después de su cierre.
+
+La eliminación de archivos será una operación controlada que deberá:
+
+1. Verificar la identidad y los permisos del usuario que solicita la eliminación.
+2. Comprobar que la operación esté permitida según las reglas del sistema.
+3. Eliminar el objeto correspondiente de Supabase Storage.
+4. Actualizar o eliminar su registro de metadatos en PostgreSQL, manteniendo la integridad de la información.
+
+No se realizará una eliminación automática de adjuntos al cerrar solicitudes.
+
+También se contemplará un procedimiento de mantenimiento para identificar archivos huérfanos, es decir, archivos almacenados que ya no tengan un registro asociado en PostgreSQL. Su eliminación deberá realizarse mediante una tarea controlada, después de verificar que realmente no estén asociados a información válida.
 
 ## 12. Comunicación y notificaciones
 
@@ -758,7 +837,7 @@ Se aplicarán las siguientes medidas:
 - Protección frente a consultas no autorizadas.
 - Variables sensibles almacenadas en el entorno del backend.
 - Restricción de acceso a archivos adjuntos.
-- Validación de formatos y tamaños.
+- Validación de formatos, contenidos y tamaños de archivos.
 - Manejo controlado de errores.
 - Registro de operaciones importantes.
 - Protección contra CSRF cuando corresponda.
@@ -778,10 +857,13 @@ Por ejemplo:
 - Registrar una solución y actualizar el estado correspondiente.
 - Cerrar una solicitud y conservar el responsable, tipo y fecha de cierre.
 - Cancelar una solicitud y registrar el motivo de cancelación.
+- Registrar los metadatos de un archivo después de confirmar su almacenamiento.
 
 Se implementarán controles para evitar inconsistencias cuando dos usuarios intenten modificar simultáneamente una solicitud.
 
 Las operaciones deberán comprobar el estado actual antes de ejecutarse. Si una operación ya no es válida, el backend devolverá un conflicto y no realizará modificaciones parciales.
+
+Para la subida de archivos se deberá contemplar el caso en que el archivo se almacene correctamente, pero falle el registro de sus metadatos en PostgreSQL. En ese escenario se deberá realizar una compensación o limpieza controlada para evitar archivos huérfanos.
 
 ## 16. Organización del proyecto
 
@@ -864,6 +946,8 @@ Se realizarán pruebas durante el desarrollo y al finalizar la integración.
 - Validación de solicitudes cerradas.
 - Diferenciación entre cierre por solución y cancelación.
 - Validación de archivos adjuntos.
+- Conversión de imágenes a WebP.
+- Verificación de dimensiones y calidad de imágenes.
 
 ### 17.2. Pruebas de integración
 
@@ -871,7 +955,11 @@ Se realizarán pruebas durante el desarrollo y al finalizar la integración.
 - Registro y consulta de solicitudes.
 - Asignación de técnicos.
 - Registro de mensajes e intervenciones.
-- Gestión de archivos.
+- Gestión de archivos en Supabase Storage.
+- Validación de archivos en el backend.
+- Registro de metadatos en PostgreSQL.
+- Conservación de adjuntos después del cierre de sesión y de solicitudes.
+- Eliminación controlada de archivos.
 - Gestión de sesiones.
 - Registro de cambios en el historial.
 - Restricciones de acceso a conversaciones.
@@ -889,6 +977,9 @@ Se realizarán pruebas durante el desarrollo y al finalizar la integración.
 - Restricciones según el rol.
 - Consulta de estadísticas.
 - Bloqueo de operaciones en solicitudes cerradas.
+- Adjuntar imágenes PNG y JPG.
+- Conversión y almacenamiento de imágenes WebP.
+- Consulta de archivos adjuntos de solicitudes cerradas.
 
 Los resultados se documentarán en `docs/pruebas.md`.
 
@@ -909,9 +1000,10 @@ El proyecto se desarrollará de manera incremental, implementando y probando cad
 | 9 | Conversación REST y notificaciones |
 | 10 | Desarrollo de interfaces por rol |
 | 11 | Integración entre frontend y backend |
-| 12 | Pruebas funcionales y corrección de errores |
-| 13 | Evaluación e incorporación posterior de WebSockets, si corresponde |
-| 14 | Documentación, evidencias y preparación de la presentación |
+| 12 | Implementación y pruebas del almacenamiento de archivos |
+| 13 | Pruebas funcionales y corrección de errores |
+| 14 | Evaluación e incorporación posterior de WebSockets, si corresponde |
+| 15 | Documentación, evidencias y preparación de la presentación |
 
 Durante todo el desarrollo se utilizará Git y GitHub para registrar los cambios, conservar versiones funcionales y documentar el avance.
 
@@ -923,11 +1015,13 @@ Las siguientes decisiones se concretarán antes o durante la implementación:
 2. Definición de los eventos de notificación por correo.
 3. Selección del mecanismo definitivo de sesiones y revocación.
 4. Configuración de la conexión y el pool de PostgreSQL.
-5. Configuración de los buckets privados de Storage.
+5. Configuración de los buckets privados de Storage y sus límites.
 6. Definición de políticas RLS, si se utilizan.
 7. Selección del proveedor de despliegue para frontend y backend.
 8. Definición de las políticas de respaldo y recuperación.
 9. Evaluación de WebSockets para una versión posterior.
+10. Implementación del proceso de conversión de imágenes a WebP en el frontend.
+11. Definición del mecanismo de limpieza controlada de archivos huérfanos.
 
 Las decisiones que afecten los requisitos deberán documentarse y, si corresponde, reflejarse también en `docs/requisitos.md`.
 
@@ -936,5 +1030,7 @@ Las decisiones que afecten los requisitos deberán documentarse y, si correspond
 Al finalizar el desarrollo se espera contar con una plataforma web funcional que permita gestionar el ciclo de atención de solicitudes de soporte técnico.
 
 La solución deberá ofrecer acceso diferenciado por roles, seguimiento de solicitudes, asignación de técnicos, registro de intervenciones, comunicación entre participantes, consulta del historial y administración general.
+
+Los archivos adjuntos deberán almacenarse de forma privada y segura, con conversión de imágenes a WebP para optimizar el espacio utilizado, conservando las evidencias necesarias para consultar el historial de atención.
 
 La arquitectura propuesta permitirá mantener separadas la interfaz, la lógica de negocio y la persistencia de datos, facilitando el mantenimiento y la evolución futura de SoporteTI.
