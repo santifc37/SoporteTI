@@ -1,6 +1,6 @@
 # Contrato de la API — SoporteTI
 
-**Versión:** 1.2  
+**Versión:** 1.3  
 **Estado:** Contrato propuesto para iniciar el desarrollo  
 **Proyecto:** SoporteTI  
 **Asignatura:** Aplicaciones y Servicios Web  
@@ -1962,7 +1962,7 @@ La API se desarrollará siguiendo los flujos verticales definidos en `docs/disen
 Después de completar los flujos principales se podrán implementar las funcionalidades complementarias:
 
 - Adjuntos en mensajes e intervenciones.
-- Notificaciones por correo.
+- Notificaciones dentro de la plataforma.
 - Mejoras de estadísticas.
 - Actualización de conversaciones en tiempo real.
 
@@ -1988,7 +1988,7 @@ Los adjuntos de imágenes en solicitudes y el mecanismo básico de solicitud y r
 | RF-20 | `/requests/{id}/close`. |
 | RF-22, RF-23 y RF-26 | `/requests/{id}/messages`. |
 | RF-24 y RF-25 | Rutas complementarias de adjuntos. |
-| RF-27 | Notificaciones, cuando se implemente el servicio correspondiente. |
+| RF-27 | Notificaciones dentro de la plataforma, cuando se implementen. |
 | RF-28 | `/requests/{id}/history`. |
 | RF-29 | `/statistics`. |
 

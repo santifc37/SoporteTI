@@ -1,6 +1,6 @@
 # Modelo entidad-relación — SoporteTI
 
-**Versión:** 1.1  
+**Versión:** 1.2  
 **Estado:** Modelo de datos revisado  
 **Proyecto:** SoporteTI  
 **Base de datos:** PostgreSQL (Supabase)
@@ -143,11 +143,8 @@ erDiagram
         UUID solicitud_id FK "nullable"
         VARCHAR tipo "evento que origina el aviso"
         TEXT contenido
-        VARCHAR canal "plataforma | correo"
-        VARCHAR estado_envio "pendiente | enviada | fallida"
         BOOLEAN leida
         TIMESTAMPTZ fecha_creacion
-        TIMESTAMPTZ fecha_envio "nullable"
     }
 
     USUARIOS ||--o{ SESIONES : inicia
@@ -200,7 +197,9 @@ erDiagram
 
 **No hay tabla de recuperación de contraseña.** La v1 permite cambiar la contraseña propia y que el coordinador la restablezca; no hay recuperación por correo o SMS.
 
-**Las notificaciones son una fase posterior.** La tabla se mantiene en el modelo, pero su implementación no es necesaria para los flujos principales.
+**Las notificaciones son internas y de una fase posterior.** Solo existen dentro de la plataforma: no hay canal de correo ni estado de envío. La tabla se mantiene en el modelo, pero su implementación no es necesaria para los flujos principales.
+
+**Los datos de contacto son informativos.** `medio_contacto_preferido` y `medio_contacto` indican cómo prefiere el usuario que lo contacte el personal de soporte. El sistema no envía mensajes automáticos por esos medios.
 
 **No se eliminan registros de negocio.** Usuarios y categorías se desactivan (`activo`, `activa`). Todas las claves foráneas usan `ON DELETE RESTRICT`.
 
@@ -214,7 +213,7 @@ Estas reglas no se ven en el diagrama. Deben implementarse en las migraciones de
 |---|---|
 | Una solicitud tiene como máximo una asignación activa | Índice único parcial |
 | `numero` único y sin colisiones en concurrencia | Secuencia de PostgreSQL |
-| Valores controlados de rol, estado, prioridad, tipo, tipo de cierre, visibilidad, canal y estados de envío | `CHECK` |
+| Valores controlados de rol, estado, prioridad, tipo, tipo de cierre, visibilidad y estado de las peticiones de información | `CHECK` |
 | Una solicitud cerrada tiene tipo, responsable y fecha de cierre; la cancelación y el cierre administrativo exigen motivo; el cierre por solución exige `solucion_final` | `CHECK` (RN-35) |
 | `solucion_final`, `resuelto_por` y `fecha_resolucion` se registran juntos | `CHECK` |
 | Si el medio preferido es teléfono, el teléfono es obligatorio | `CHECK` |

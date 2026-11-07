@@ -1,6 +1,6 @@
 # Documento de requisitos — SoporteTI
 
-**Versión:** 1.4  
+**Versión:** 1.5  
 **Estado:** Requisitos revisados para iniciar el desarrollo  
 **Proyecto:** SoporteTI  
 **Asignatura:** Aplicaciones y Servicios Web  
@@ -45,6 +45,7 @@ La primera versión no incluirá:
 - Aplicación móvil nativa.
 - Chat en tiempo real mediante WebSockets.
 - Recepción y procesamiento automático de respuestas enviadas al correo electrónico.
+- Envío de notificaciones o mensajes por correo electrónico, mensajes de texto u otros servicios externos.
 - Integraciones con sistemas externos de gestión empresarial.
 - Gestión de inventario de equipos o repuestos.
 - Diagnósticos automáticos mediante inteligencia artificial.
@@ -175,7 +176,7 @@ Si un usuario no recuerda su contraseña, el coordinador podrá restablecerla as
 
 El sistema debe permitir almacenar y actualizar los datos de contacto de los usuarios, incluyendo nombre, medio de contacto preferido y la información necesaria para utilizarlo.
 
-Los medios de contacto contemplados inicialmente serán correo electrónico y teléfono.
+Los medios de contacto contemplados inicialmente serán correo electrónico y teléfono. El personal de soporte utilizará estos datos para comunicarse con el solicitante cuando sea necesario; el sistema no enviará mensajes automáticos por esos medios.
 
 **Criterio de aceptación:** Dado un usuario con acceso a sus datos de contacto, cuando registre o actualice su información, el sistema deberá conservarla y permitir consultarla de acuerdo con los permisos correspondientes.
 
@@ -376,16 +377,14 @@ El sistema debe conservar los mensajes de cada solicitud en orden cronológico p
 
 **Criterio de aceptación:** Dada una solicitud con mensajes registrados, cuando un participante autorizado consulte la conversación, el sistema deberá presentar los mensajes en orden cronológico, conservando su autor y fecha.
 
-**RF-27. Notificaciones**  
+**RF-27. Notificaciones en la plataforma**  
 **Prioridad:** B
 
-El sistema podrá generar notificaciones relacionadas con eventos relevantes de una solicitud.
+El sistema podrá generar notificaciones dentro de la plataforma relacionadas con eventos relevantes de una solicitud. El usuario podrá consultarlas y marcarlas como leídas.
 
-Cuando el usuario haya seleccionado el correo electrónico como medio de contacto y se encuentre configurado el servicio correspondiente, el sistema podrá enviar notificaciones a ese correo.
+Las notificaciones no se enviarán por correo electrónico, mensajes de texto ni otros servicios externos.
 
-El correo será un canal de notificación. Las respuestas y comunicaciones dentro de la solicitud se realizarán desde la plataforma.
-
-**Criterio de aceptación:** Dado un evento para el que exista una notificación configurada y un usuario con correo válido, cuando ocurra el evento, el sistema deberá generar la notificación correspondiente. La comunicación no dependerá de recibir respuestas por correo.
+**Criterio de aceptación:** Dado un evento para el que exista una notificación configurada, cuando ocurra el evento, el sistema deberá generar la notificación para el usuario correspondiente y permitirle consultarla en la plataforma.
 
 **RF-28. Historial de cambios**  
 **Prioridad:** A
@@ -461,7 +460,7 @@ El sistema debe permitir al coordinador consultar estadísticas básicas sobre l
 
 **RN-28.** Los archivos adjuntos deberán ser imágenes en formato PNG o JPG/JPEG y no podrán superar los 5 MB por archivo.
 
-**RN-29.** El correo electrónico se utilizará para enviar notificaciones cuando el usuario haya seleccionado ese medio de contacto y el servicio esté disponible.
+**RN-29.** El sistema no enviará mensajes por correo electrónico, mensajes de texto ni otros servicios externos. Las comunicaciones y los avisos se realizarán dentro de la plataforma.
 
 **RN-30.** Toda modificación importante de una solicitud deberá quedar registrada en el historial, incluyendo el usuario responsable y la fecha de la acción.
 
@@ -570,11 +569,11 @@ No se implementará comunicación en tiempo real mediante WebSockets en esta ver
 
 La actualización de los mensajes podrá realizarse mediante nuevas consultas a la API. La comunicación en tiempo real se considera una mejora futura.
 
-### 9.5 Notificaciones por correo
+### 9.5 Notificaciones
 
-El correo electrónico podrá utilizarse para notificar eventos relacionados con las solicitudes cuando el usuario haya seleccionado ese medio de contacto y el servicio esté configurado.
+Los avisos sobre eventos de las solicitudes podrán mostrarse dentro de la plataforma.
 
-Las respuestas a los correos no se incorporarán automáticamente a la conversación de la plataforma.
+El sistema no enviará correos electrónicos ni mensajes de texto. Toda la comunicación se realizará dentro de la plataforma.
 
 ## 10. Requisitos no funcionales
 
@@ -630,7 +629,7 @@ Las respuestas a los correos no se incorporarán automáticamente a la conversac
 
 **S-07.** Los usuarios proporcionarán información de contacto válida cuando corresponda.
 
-**S-08.** El correo electrónico podrá utilizarse como medio de notificación cuando haya sido seleccionado por el usuario y el servicio esté configurado.
+**S-08.** Los avisos sobre eventos de las solicitudes, cuando se implementen, se mostrarán dentro de la plataforma; no se utilizarán el correo electrónico ni otros servicios externos para enviarlos.
 
 **S-09.** Los usuarios utilizarán la plataforma para enviar y consultar los mensajes relacionados con sus solicitudes.
 

@@ -1,6 +1,6 @@
 # Diseño de la solución — SoporteTI
 
-**Versión:** 1.6  
+**Versión:** 1.7  
 **Estado:** Diseño técnico revisado  
 **Proyecto:** SoporteTI  
 **Asignatura:** Aplicaciones y Servicios Web  
@@ -422,7 +422,7 @@ El archivo físico se almacenará en Supabase Storage. PostgreSQL conservará ú
 
 #### 6.1.11. notificaciones
 
-La tabla de notificaciones podrá utilizarse para registrar avisos generados para los usuarios cuando se implemente este módulo.
+La tabla de notificaciones podrá utilizarse para registrar los avisos que se muestran a los usuarios dentro de la plataforma cuando se implemente este módulo. No se enviarán por correo electrónico ni por otros servicios externos.
 
 Campos propuestos:
 
@@ -431,11 +431,8 @@ Campos propuestos:
 - `solicitud_id`: solicitud relacionada, cuando corresponda.
 - `tipo`: tipo de notificación.
 - `contenido`: descripción del aviso.
-- `canal`: plataforma o correo.
-- `estado_envio`: estado del envío.
 - `leida`: indica si el usuario la ha leído en la plataforma.
 - `fecha_creacion`: fecha de creación.
-- `fecha_envio`: fecha de envío, cuando corresponda.
 
 Su implementación podrá realizarse después de completar los flujos principales.
 
@@ -873,11 +870,11 @@ Las peticiones y respuestas se almacenarán en entidades propias, separadas de l
 
 ### 12.4. Notificaciones
 
-Las notificaciones por correo podrán incorporarse para informar sobre eventos relevantes.
+Los avisos sobre eventos relevantes de las solicitudes podrán mostrarse dentro de la plataforma.
 
-El correo será un canal de aviso. Las respuestas y comunicaciones relacionadas con las solicitudes se gestionarán desde la plataforma.
+La primera versión no enviará notificaciones por correo electrónico, mensajes de texto ni otros servicios externos. Las respuestas y comunicaciones relacionadas con las solicitudes se gestionarán desde la plataforma.
 
-La implementación de notificaciones automáticas podrá realizarse después de completar los flujos principales.
+La implementación de las notificaciones internas podrá realizarse después de completar los flujos principales.
 
 ### 12.5. Actualización de conversaciones
 
@@ -1103,7 +1100,7 @@ El desarrollo se organizará por flujos funcionales completos. Cada flujo deber�
 Después de completar los flujos principales, se podrán incorporar las funcionalidades complementarias que permita el tiempo disponible, como:
 
 - Adjuntos en mensajes e intervenciones.
-- Notificaciones por correo.
+- Notificaciones dentro de la plataforma.
 - Actualizaciones de conversación en tiempo real.
 - Conversión de imágenes a WebP.
 - Mejoras de estadísticas.
@@ -1136,7 +1133,7 @@ Las siguientes funcionalidades no son necesarias para completar los flujos princ
 1. Comunicación en tiempo real mediante WebSockets.
 2. Conversión y optimización de imágenes a WebP.
 3. Redimensionamiento automático de imágenes.
-4. Notificaciones avanzadas por correo.
+4. Envío de notificaciones por correo electrónico u otros servicios externos.
 5. Políticas RLS adicionales, si la arquitectura de acceso las requiere.
 6. Automatización de respaldos y recuperación.
 7. Limpieza automatizada de archivos huérfanos.
