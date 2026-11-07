@@ -1,6 +1,6 @@
 # Contrato de la API — SoporteTI
 
-**Versión:** 1.0  
+**Versión:** 1.3  
 **Estado:** Contrato propuesto para iniciar el desarrollo  
 **Proyecto:** SoporteTI  
 **Asignatura:** Aplicaciones y Servicios Web  
@@ -105,6 +105,8 @@ La API reconocerá tres roles:
 | Consultar usuarios | No | No | Sí |
 | Crear usuarios | No | No | Sí |
 | Modificar usuarios | Solo datos propios permitidos | Solo datos propios permitidos | Sí |
+| Cambiar su propia contraseña | Sí | Sí | Sí |
+| Restablecer la contraseña de otro usuario | No | No | Sí |
 | Gestionar categorías | No | No | Sí |
 | Crear solicitudes | Sí | No | No |
 | Consultar solicitudes | Propias | Asignadas actualmente | Todas |
@@ -280,7 +282,43 @@ Si no existe una sesión válida, devolverá `401 Unauthorized`.
 
 El backend deberá comprobar la contraseña actual antes de actualizar el hash almacenado.
 
-El procedimiento de recuperación de contraseña mediante verificación externa se implementará cuando se defina y configure el servicio necesario para realizarlo. No se permitirá recuperar una cuenta únicamente proporcionando un correo electrónico.
+La primera versión no incluye recuperación automática de contraseña mediante correo electrónico, mensajes de texto u otro servicio externo. No se permitirá recuperar una cuenta únicamente proporcionando un correo electrónico.
+
+### 4.5. Restablecer contraseña de un usuario
+
+**Método:** `POST`
+
+**Ruta:**
+
+```text
+/api/v1/users/{id}/reset-password
+```
+
+**Permisos:** Coordinador.
+
+**Petición:**
+
+```json
+{
+  "contrasena_temporal": "Temporal123"
+}
+```
+
+**Respuesta:** `200 OK`
+
+```json
+{
+  "mensaje": "Contraseña restablecida correctamente"
+}
+```
+
+Reglas:
+- La contraseña temporal deberá cumplir las políticas de seguridad.
+- El backend almacenará únicamente el hash de la nueva contraseña.
+- La operación revocará las sesiones activas del usuario afectado.
+- La contraseña nunca deberá devolverse en la respuesta.
+- El coordinador deberá comunicar la contraseña temporal al usuario por un medio externo a la plataforma.
+- Esta ruta no sustituye a `PATCH /api/v1/users/{id}`, que no modifica contraseñas.
 
 ---
 
@@ -770,6 +808,8 @@ Reglas:
   "tipo_cierre": null,
   "motivo_cierre": null,
   "solucion_final": null,
+  "resuelto_por": null,
+  "fecha_resolucion": null,
   "fecha_creacion": "2026-11-06T10:00:00Z",
   "fecha_actualizacion": "2026-11-06T11:00:00Z",
   "fecha_cierre": null
@@ -997,7 +1037,6 @@ El solicitante solo recibirá la información del responsable actual, no informa
 {
   "descripcion": "Se revisó la conexión eléctrica del equipo.",
   "diagnostico": "El cable de alimentación presenta daños.",
-  "solucion": null,
   "visibilidad": "solicitante"
 }
 ```
@@ -1017,7 +1056,6 @@ Valores permitidos para `visibilidad`:
     "tecnico_id": "uuid",
     "descripcion": "Se revisó la conexión eléctrica del equipo.",
     "diagnostico": "El cable de alimentación presenta daños.",
-    "solucion": null,
     "visibilidad": "solicitante",
     "fecha_registro": "2026-11-06T13:00:00Z"
   }
@@ -1030,6 +1068,7 @@ Reglas:
 - La solicitud debe estar asignada actualmente al técnico.
 - No se permitirán intervenciones en solicitudes cerradas.
 - Las intervenciones internas no serán visibles para el solicitante.
+- Las intervenciones registran la descripción y el diagnóstico. La solución definitiva no se registra aquí, sino mediante `POST /api/v1/requests/{id}/resolve`.
 
 ### 10.2. Consultar intervenciones
 
@@ -1057,7 +1096,6 @@ Reglas:
       "tecnico_nombre": "Carlos Gómez",
       "descripcion": "Se revisó la conexión eléctrica del equipo.",
       "diagnostico": "El cable presenta daños.",
-      "solucion": null,
       "visibilidad": "solicitante",
       "fecha_registro": "2026-11-06T13:00:00Z"
     }
@@ -1332,6 +1370,8 @@ La primera versión utilizará consultas REST para actualizar la conversación. 
     "estado_anterior": "en_atencion",
     "estado_actual": "resuelto",
     "solucion_final": "Se reemplazó el cable de alimentación y se comprobó el funcionamiento del equipo.",
+    "resuelto_por": "uuid",
+    "fecha_resolucion": "2026-11-06T15:00:00Z",
     "fecha_actualizacion": "2026-11-06T15:00:00Z"
   }
 }
@@ -1342,7 +1382,8 @@ Reglas:
 - Solo el técnico asignado puede registrar la solución.
 - La solicitud debe estar en `en_atencion` o `en_espera`.
 - El registro cambiará el estado a `resuelto`.
-- La solución deberá quedar registrada en el historial.
+- La solución se guarda en `solucion_final`, junto con `resuelto_por` y `fecha_resolucion`, en la misma transacción que el cambio de estado.
+- La solución deberá quedar registrada en el historial con el tipo de cambio `solucion`.
 - El técnico no podrá cerrar la solicitud.
 
 ### 13.2. Cerrar solicitud
@@ -1399,7 +1440,7 @@ Reglas:
 - El cierre administrativo exige un motivo.
 - El tipo de cierre deberá ser `solucion` o `administrativo`.
 - El responsable y la fecha de cierre se obtendrán del backend.
-- El cierre deberá quedar registrado en el historial.
+- El cierre deberá quedar registrado en el historial con el tipo de cambio `cierre_solucion` o `cierre_administrativo`, según corresponda.
 - Una solicitud cerrada no podrá reabrirse.
 
 ### 13.3. Cancelar solicitud
@@ -1444,7 +1485,7 @@ Reglas:
 - La solicitud deberá estar en `registrado` o `en_evaluacion`.
 - El motivo será obligatorio.
 - El tipo de cierre será `cancelacion`.
-- La cancelación quedará registrada en el historial.
+- La cancelación quedará registrada en el historial con el tipo de cambio `cancelacion`.
 
 ---
 
@@ -1506,6 +1547,21 @@ Reglas:
 - Los usuarios no podrán modificar ni eliminar registros históricos mediante la API.
 - Los cambios importantes deberán registrarse junto con el usuario responsable y la fecha.
 - La consulta del historial no se confundirá con la consulta de mensajes ni de intervenciones.
+
+Valores permitidos para `tipo_cambio`:
+
+| Valor | Se registra cuando |
+|---|---|
+| `creacion` | Se crea la solicitud. |
+| `cambio_estado` | Cambia el estado mediante `/status`. |
+| `cambio_prioridad` | El coordinador modifica la prioridad. |
+| `cambio_categoria` | El coordinador modifica la categoría. |
+| `asignacion` | Se asigna el primer técnico. |
+| `reasignacion` | Se cambia el técnico responsable. |
+| `solucion` | El técnico registra la solución. |
+| `cierre_solucion` | El coordinador cierra por solución. |
+| `cierre_administrativo` | El coordinador cierra por causa administrativa. |
+| `cancelacion` | El solicitante cancela la solicitud. |
 
 ---
 
@@ -1683,6 +1739,7 @@ No son necesarias para cerrar los primeros flujos principales.
 Reglas:
 - Los resultados se calcularán a partir de los registros existentes.
 - El tiempo promedio solo se devolverá cuando exista información suficiente para calcularlo.
+- El tiempo promedio de atención se calculará entre `fecha_creacion` y `fecha_resolucion` de las solicitudes que tengan solución registrada.
 - El módulo será exclusivo del coordinador.
 - Los filtros de fechas deberán aplicarse de forma consistente a los indicadores.
 
@@ -1905,8 +1962,7 @@ La API se desarrollará siguiendo los flujos verticales definidos en `docs/disen
 Después de completar los flujos principales se podrán implementar las funcionalidades complementarias:
 
 - Adjuntos en mensajes e intervenciones.
-- Recuperación de contraseña mediante verificación externa.
-- Notificaciones por correo.
+- Notificaciones dentro de la plataforma.
 - Mejoras de estadísticas.
 - Actualización de conversaciones en tiempo real.
 
@@ -1920,7 +1976,7 @@ Los adjuntos de imágenes en solicitudes y el mecanismo básico de solicitud y r
 |---|---|
 | RF-01 y RF-02 | `/auth/login`, `/auth/logout`, `/auth/me` y autorización por roles. |
 | RF-03 y RF-05 | `/users` y `/users/{id}`. |
-| RF-04 | `/auth/change-password` y futura recuperación verificada. |
+| RF-04 | `/auth/change-password` y `/users/{id}/reset-password`. |
 | RF-06, RF-07 y RF-08 | `/requests` y `/requests/{id}/attachments`. |
 | RF-09 y RF-10 | `/requests/{id}` y `/requests/{id}/status`. |
 | RF-11 y RF-12 | `/requests/{id}/assignments`. |
@@ -1932,7 +1988,7 @@ Los adjuntos de imágenes en solicitudes y el mecanismo básico de solicitud y r
 | RF-20 | `/requests/{id}/close`. |
 | RF-22, RF-23 y RF-26 | `/requests/{id}/messages`. |
 | RF-24 y RF-25 | Rutas complementarias de adjuntos. |
-| RF-27 | Notificaciones, cuando se implemente el servicio correspondiente. |
+| RF-27 | Notificaciones dentro de la plataforma, cuando se implementen. |
 | RF-28 | `/requests/{id}/history`. |
 | RF-29 | `/statistics`. |
 
