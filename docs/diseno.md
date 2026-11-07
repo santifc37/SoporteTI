@@ -1,6 +1,6 @@
 # Diseño de la solución — SoporteTI
 
-**Versión:** 1.4  
+**Versión:** 1.6  
 **Estado:** Diseño técnico revisado  
 **Proyecto:** SoporteTI  
 **Asignatura:** Aplicaciones y Servicios Web  
@@ -161,10 +161,12 @@ Se mantendrá una convención de rutas en inglés para los recursos y operacione
 | POST | `/api/v1/auth/login` | Iniciar sesión. |
 | POST | `/api/v1/auth/logout` | Cerrar sesión. |
 | GET | `/api/v1/auth/me` | Consultar usuario autenticado. |
+| POST | `/api/v1/auth/change-password` | Cambiar la contraseña propia. |
 | GET | `/api/v1/users` | Consultar usuarios. |
 | POST | `/api/v1/users` | Crear usuarios. |
 | GET | `/api/v1/users/{id}` | Consultar un usuario. |
 | PATCH | `/api/v1/users/{id}` | Modificar datos permitidos. |
+| POST | `/api/v1/users/{id}/reset-password` | Restablecer la contraseña de un usuario (coordinador). |
 | GET | `/api/v1/categories` | Consultar categorías. |
 | POST | `/api/v1/categories` | Crear categorías. |
 | PATCH | `/api/v1/categories/{id}` | Modificar categorías. |
@@ -274,7 +276,7 @@ Contiene la información principal de cada solicitud de soporte.
 Campos propuestos:
 
 - `id`: UUID, clave primaria.
-- `numero`: identificador legible y único de la solicitud.
+- `numero`: identificador legible y único de la solicitud (formato ST-000001), generado mediante una secuencia de la base de datos.
 - `titulo`: título del problema.
 - `descripcion`: descripción del problema.
 - `tipo`: incidente o requerimiento.
@@ -285,14 +287,17 @@ Campos propuestos:
 - `ubicacion`: lugar donde se encuentra el equipo o donde ocurre el problema.
 - `placa_equipo`: placa o identificador del equipo, cuando corresponda.
 - `medio_contacto`: medio de contacto indicado para la solicitud.
-- `dato_contacto`: correo o teléfono correspondiente, cuando aplique.
+- `dato_contacto`: correo o teléfono correspondiente al medio indicado.
 - `tipo_cierre`: solución, cancelación o administrativo, cuando corresponda.
 - `motivo_cierre`: explicación del cierre, cuando aplique.
 - `fecha_creacion`: fecha de registro.
 - `fecha_actualizacion`: última modificación.
 - `fecha_cierre`: fecha de cierre, cuando corresponda.
 - `cerrado_por`: usuario responsable del cierre.
-- `solucion_final`: resumen de la solución definitiva, cuando exista.
+- `solucion_final`: solución definitiva registrada por el técnico, cuando exista. Es la única fuente de la solución.
+- `resuelto_por`: técnico que registró la solución, cuando exista.
+- `fecha_resolucion`: fecha y hora en que se registró la solución, cuando exista.
+- `version`: número de versión de la fila, utilizado para el control de concurrencia optimista.
 
 El técnico responsable se obtendrá de la tabla de asignaciones activas, evitando mantener el mismo dato duplicado en dos tablas.
 
@@ -366,12 +371,12 @@ Campos propuestos:
 - `tecnico_id`: técnico que registra la intervención.
 - `descripcion`: actividad realizada.
 - `diagnostico`: diagnóstico técnico, cuando corresponda.
-- `solucion`: solución aplicada, cuando corresponda.
-- `tipo`: clasificación de la intervención.
-- `visible_solicitante`: indica si el solicitante puede consultarla.
+- `visibilidad`: `interna` o `solicitante`; define si el solicitante puede consultarla.
 - `fecha_registro`: fecha y hora del registro.
 
 Las intervenciones se mantendrán separadas de los mensajes de conversación.
+
+La solución definitiva no se registra en las intervenciones, sino en `solicitudes.solucion_final`, mediante la operación de resolución.
 
 #### 6.1.9. historial_cambios
 
@@ -389,6 +394,8 @@ Campos propuestos:
 - `fecha_cambio`: fecha y hora del cambio.
 
 Se utilizará para registrar cambios de estado, prioridad, categoría, asignaciones, cierres y cancelaciones.
+
+Valores de `tipo_cambio`: `creacion`, `cambio_estado`, `cambio_prioridad`, `cambio_categoria`, `asignacion`, `reasignacion`, `solucion`, `cierre_solucion`, `cierre_administrativo` y `cancelacion`. Los cierres por solución y administrativo y la cancelación tienen valores distintos para poder diferenciarlos al consultar el historial.
 
 La tabla de asignaciones conservará el detalle de cada asignación; el historial general permitirá consultar los cambios como parte de la evolución de la solicitud.
 
@@ -432,6 +439,21 @@ Campos propuestos:
 
 Su implementación podrá realizarse después de completar los flujos principales.
 
+#### 6.1.12. sesiones
+
+Almacena las sesiones activas e históricas de los usuarios autenticados.
+
+Campos propuestos:
+
+- `id`: UUID, clave primaria.
+- `usuario_id`: usuario propietario de la sesión.
+- `token_hash`: hash del identificador de sesión, único. El identificador original no se almacena.
+- `fecha_creacion`: fecha de inicio de la sesión.
+- `fecha_expiracion`: fecha en que vence la sesión.
+- `revocada`: indica si la sesión fue invalidada.
+
+Las sesiones se revocan al cerrar sesión, al desactivar la cuenta y al restablecer la contraseña del usuario.
+
 ### 6.2. Relaciones principales
 
 - Un usuario solicitante puede registrar múltiples solicitudes.
@@ -448,31 +470,41 @@ Su implementación podrá realizarse después de completar los flujos principale
 - Una solicitud puede tener múltiples registros de historial.
 - Una solicitud puede tener múltiples archivos adjuntos.
 - Un usuario puede recibir múltiples notificaciones.
+- Un usuario puede tener múltiples sesiones.
+- Un adjunto pertenece a una solicitud y, opcionalmente, a un mensaje o a una intervención, pero no a ambos.
+- Una solicitud puede referenciar opcionalmente al técnico que registró la solución y al usuario que la cerró.
 
-### 6.3. Diagrama entidad-relación preliminar
+### 6.3. Diagrama entidad-relación
 
 ```mermaid
 erDiagram
+    USUARIOS ||--o{ SESIONES : inicia
     USUARIOS ||--o{ SOLICITUDES : crea
-    CATEGORIAS ||--o{ SOLICITUDES : clasifica
-    USUARIOS ||--o{ ASIGNACIONES : recibe
-    SOLICITUDES ||--o{ ASIGNACIONES : registra
+    CATEGORIAS |o--o{ SOLICITUDES : clasifica
+    USUARIOS |o--o{ SOLICITUDES : resuelve
+    USUARIOS |o--o{ SOLICITUDES : cierra
+    SOLICITUDES ||--o{ ASIGNACIONES : tiene
+    USUARIOS ||--o{ ASIGNACIONES : es_tecnico
+    USUARIOS ||--o{ ASIGNACIONES : asigna
     SOLICITUDES ||--o{ MENSAJES : contiene
     USUARIOS ||--o{ MENSAJES : envia
-    SOLICITUDES ||--o{ SOLICITUDES_INFORMACION : requiere
+    SOLICITUDES ||--o{ SOLICITUDES_INFORMACION : genera
     USUARIOS ||--o{ SOLICITUDES_INFORMACION : solicita
     SOLICITUDES_INFORMACION ||--o| RESPUESTAS_INFORMACION : recibe
     USUARIOS ||--o{ RESPUESTAS_INFORMACION : responde
-    SOLICITUDES ||--o{ INTERVENCIONES : contiene
+    SOLICITUDES ||--o{ INTERVENCIONES : recibe
     USUARIOS ||--o{ INTERVENCIONES : registra
     SOLICITUDES ||--o{ HISTORIAL_CAMBIOS : registra
-    USUARIOS ||--o{ HISTORIAL_CAMBIOS : realiza
-    SOLICITUDES ||--o{ ADJUNTOS : contiene
-    SOLICITUDES ||--o{ NOTIFICACIONES : genera
+    USUARIOS ||--o{ HISTORIAL_CAMBIOS : ejecuta
+    SOLICITUDES ||--o{ ADJUNTOS : adjunta
+    MENSAJES |o--o{ ADJUNTOS : adjunta
+    INTERVENCIONES |o--o{ ADJUNTOS : adjunta
+    USUARIOS ||--o{ ADJUNTOS : sube
     USUARIOS ||--o{ NOTIFICACIONES : recibe
+    SOLICITUDES |o--o{ NOTIFICACIONES : relaciona
 ```
 
-Este modelo es preliminar. Durante la implementación se definirán los tipos de datos, restricciones, índices, claves foráneas y reglas de integridad.
+El diagrama con los atributos de cada entidad, las reglas de integridad y los índices recomendados se encuentra en `docs/MER.md`. Si existe alguna diferencia, `docs/MER.md` refleja la decisión más reciente.
 
 ### 6.4. Restricciones de integridad
 
@@ -494,7 +526,7 @@ Se establecerán restricciones para garantizar la consistencia de la informació
 - Una solicitud con estado `Cerrado` deberá tener tipo y fecha de cierre.
 - El tipo de cierre deberá distinguir entre solución, cancelación y administrativo.
 
-Las reglas que involucren varias tablas se validarán mediante transacciones y lógica de negocio en el backend, utilizando restricciones adicionales cuando sea posible.
+Las reglas que involucren varias tablas se validarán mediante transacciones y lógica de negocio en el backend, utilizando restricciones adicionales cuando sea posible. Las restricciones concretas, con su implementación en PostgreSQL, se detallan en `docs/MER.md`.
 
 ## 7. Diseño de los estados y transiciones
 
@@ -684,7 +716,9 @@ El coordinador será responsable de crear las cuentas de los usuarios.
 
 No se permitirá el registro público.
 
-La recuperación de acceso y el cambio de contraseña se implementarán mediante un procedimiento seguro cuando se complete ese módulo.
+Los usuarios autenticados podrán cambiar su contraseña indicando la contraseña actual. Si un usuario olvida su contraseña, el coordinador podrá restablecerla asignando una contraseña temporal.
+
+La recuperación automática mediante correo electrónico, mensajes de texto u otro servicio externo no forma parte de la primera versión.
 
 ### 9.4. Autorización por roles
 
@@ -956,6 +990,7 @@ SoporteTI/
 ├── docs/
 │   ├── requisitos.md
 │   ├── diseno.md
+│   ├── MER.md
 │   ├── contrato-api.md
 │   ├── guia-desarrollo.md
 │   ├── trazabilidad.md

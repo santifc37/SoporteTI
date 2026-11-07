@@ -1,6 +1,6 @@
 # Documento de requisitos — SoporteTI
 
-**Versión:** 1.3  
+**Versión:** 1.4  
 **Estado:** Requisitos revisados para iniciar el desarrollo  
 **Proyecto:** SoporteTI  
 **Asignatura:** Aplicaciones y Servicios Web  
@@ -50,6 +50,7 @@ La primera versión no incluirá:
 - Diagnósticos automáticos mediante inteligencia artificial.
 - Reapertura de solicitudes cerradas.
 - Conversión y optimización avanzada de imágenes antes de almacenarlas.
+- Recuperación automática de contraseña mediante correo electrónico, mensajes de texto u otro servicio de verificación externo.
 
 Estas funcionalidades podrán evaluarse como mejoras posteriores, siempre que no afecten el cumplimiento de los criterios de aceptación principales.
 
@@ -160,12 +161,14 @@ No existirá un mecanismo de registro público.
 
 **Criterio de aceptación:** Dado un coordinador autenticado, cuando cree una cuenta con información válida y un rol permitido, el sistema deberá registrarla. Un usuario sin permisos de coordinación no podrá realizar esta operación.
 
-**RF-04. Recuperación y cambio de contraseña**  
+**RF-04. Cambio y restablecimiento de contraseña**  
 **Prioridad:** M
 
-El sistema debe proporcionar un mecanismo para cambiar la contraseña de una cuenta y recuperar el acceso mediante un procedimiento de verificación.
+El sistema debe permitir que un usuario autenticado cambie su contraseña indicando la contraseña actual y una nueva.
 
-**Criterio de aceptación:** Dado un usuario autorizado para cambiar su contraseña, cuando proporcione los datos requeridos y una nueva contraseña válida, el sistema deberá actualizarla y permitir el acceso con la nueva credencial.
+Si un usuario no recuerda su contraseña, el coordinador podrá restablecerla asignando una contraseña temporal. El sistema no incluirá recuperación automática mediante correo electrónico, mensajes de texto u otro servicio externo.
+
+**Criterio de aceptación:** Dado un usuario autenticado, cuando proporcione su contraseña actual correcta y una nueva contraseña válida, el sistema deberá actualizarla y permitir el acceso con la nueva credencial. Dado un coordinador autenticado, cuando restablezca la contraseña de una cuenta, el sistema deberá guardar la nueva credencial de forma segura. Un usuario sin permisos de coordinación no podrá restablecer contraseñas ajenas.
 
 **RF-05. Gestión de datos de contacto**  
 **Prioridad:** M
