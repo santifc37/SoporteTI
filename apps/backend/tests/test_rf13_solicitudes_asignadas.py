@@ -1,8 +1,13 @@
 """Pruebas de RF-13: consulta de solicitudes asignadas al técnico.
 
 Usan SQLite en memoria (no tocan Supabase). El filtrado por asignación activa
+<<<<<<< HEAD
 se prueba con datos reales; la autenticación se sustituye mientras no exista
 el login (RF-01).
+=======
+se prueba con datos reales. En la mayoría de pruebas la sesión se simula con
+`como()`; una prueba usa el login real (RF-01) de punta a punta.
+>>>>>>> d99aab98665419ab1253fcc9c486aab8b9f06f35
 """
 
 import itertools
@@ -16,6 +21,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.api.dependencies import UsuarioActual, get_current_user
+<<<<<<< HEAD
+=======
+from app.core.security import hash_password
+>>>>>>> d99aab98665419ab1253fcc9c486aab8b9f06f35
 from app.database.session import get_db
 from app.main import app
 from app.models import Asignacion, Base, Categoria, Solicitud, Usuario
@@ -47,16 +56,34 @@ def client(db):
 def como(usuario: Usuario):
     """Simula la sesión del usuario indicado."""
     app.dependency_overrides[get_current_user] = lambda: UsuarioActual(
+<<<<<<< HEAD
         id=usuario.id, rol=usuario.rol
     )
 
 
 def crear_usuario(db, rol, nombre="Ana", apellido="Pérez"):
+=======
+        id=usuario.id,
+        rol=usuario.rol,
+        nombre=usuario.nombre,
+        apellido=usuario.apellido,
+        correo=usuario.correo,
+        activo=True,
+        sesion_id=uuid.uuid4(),
+    )
+
+
+def crear_usuario(db, rol, nombre="Ana", apellido="Pérez", contrasena="x"):
+>>>>>>> d99aab98665419ab1253fcc9c486aab8b9f06f35
     usuario = Usuario(
         nombre=nombre,
         apellido=apellido,
         correo=f"{uuid.uuid4()}@test.com",
+<<<<<<< HEAD
         password_hash="x",
+=======
+        password_hash=hash_password(contrasena),
+>>>>>>> d99aab98665419ab1253fcc9c486aab8b9f06f35
         rol=rol,
     )
     db.add(usuario)
@@ -304,11 +331,30 @@ def test_sin_sesion_responde_401_con_formato_de_error(client):
     }
 
 
+<<<<<<< HEAD
 def test_encabezado_de_desarrollo_es_ignorado_si_no_esta_activado(client, escenario):
     """Sin DEV_AUTH_ENABLED el encabezado X-Dev-User-Id no autentica a nadie."""
     respuesta = client.get(URL, headers={"X-Dev-User-Id": str(escenario["tecnico"].id)})
 
     assert respuesta.status_code == 401
+=======
+def test_con_login_real_de_punta_a_punta(client, db, escenario):
+    """Sin simular la sesión: login con cookie y consulta del técnico."""
+    tecnico = crear_usuario(db, "tecnico", "Rosa", "Mejía", contrasena="Contrasena123")
+    propia = crear_solicitud(db, escenario["solicitante"], tecnico)
+    crear_solicitud(db, escenario["solicitante"], escenario["otro_tecnico"])
+
+    login = client.post(
+        "/api/v1/auth/login",
+        json={"correo": tecnico.correo, "contrasena": "Contrasena123"},
+    )
+    assert login.status_code == 200
+
+    respuesta = client.get(URL)
+
+    assert respuesta.status_code == 200
+    assert [s["id"] for s in respuesta.json()["data"]] == [str(propia.id)]
+>>>>>>> d99aab98665419ab1253fcc9c486aab8b9f06f35
 
 
 def test_roles_sin_implementar_responden_501(client, escenario):
