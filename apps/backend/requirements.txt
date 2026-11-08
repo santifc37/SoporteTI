@@ -1,4 +1,8 @@
+fastapi
+uvicorn[standard]
 alembic
 sqlalchemy
 psycopg[binary]
 python-dotenv
+pytest
+httpx
