@@ -1,7 +1,7 @@
 # Modelo entidad-relación — SoporteTI
 
-**Versión:** 1.2  
-**Estado:** Modelo de datos revisado  
+**Versión:** 1.3  
+**Estado:** Modelo de datos revisado; reglas de integridad repartidas entre base de datos y backend  
 **Proyecto:** SoporteTI  
 **Base de datos:** PostgreSQL (Supabase)
 
@@ -205,22 +205,26 @@ erDiagram
 
 ## 3. Reglas de integridad
 
-Estas reglas no se ven en el diagrama. Deben implementarse en las migraciones de Alembic o en los servicios.
+Estas reglas no se ven en el diagrama. Se reparten así:
+
+- **Base de datos (§3.1):** solo las reglas baratas y estables, que protegen la integridad aunque el backend tenga un error. Están en las migraciones `0001_esquema_inicial` y `0002_restricciones_integridad`.
+- **Backend (§3.2):** las reglas de negocio y las que pueden cambiar. Se validan en los esquemas Pydantic y en los servicios, con los códigos de error de `contrato-api.md`.
+
+Como RLS está activado en todas las tablas, solo el backend escribe en la base de datos. Por eso las reglas del backend no se pueden saltar desde la API de Supabase.
 
 ### 3.1. En la base de datos
 
-| Regla | Mecanismo |
-|---|---|
-| Una solicitud tiene como máximo una asignación activa | Índice único parcial |
-| `numero` único y sin colisiones en concurrencia | Secuencia de PostgreSQL |
-| Valores controlados de rol, estado, prioridad, tipo, tipo de cierre, visibilidad y estado de las peticiones de información | `CHECK` |
-| Una solicitud cerrada tiene tipo, responsable y fecha de cierre; la cancelación y el cierre administrativo exigen motivo; el cierre por solución exige `solucion_final` | `CHECK` (RN-35) |
-| `solucion_final`, `resuelto_por` y `fecha_resolucion` se registran juntos | `CHECK` |
-| Si el medio preferido es teléfono, el teléfono es obligatorio | `CHECK` |
-| Un adjunto pertenece a un mensaje o a una intervención, no a ambos, y estos corresponden a la misma solicitud | `CHECK` y claves foráneas compuestas |
-| Una petición de información tiene como máximo una respuesta | `UNIQUE` en `solicitud_informacion_id` |
-| El historial no se modifica ni se elimina | Trigger |
-| Un adjunto no supera 5 MB y es PNG o JPEG | `CHECK` en `tamano` y `tipo_archivo` |
+| Regla | Mecanismo | Migración |
+|---|---|---|
+| Una solicitud tiene como máximo una asignación activa | Índice único parcial | 0001 |
+| `numero` único y sin colisiones en concurrencia | Secuencia de PostgreSQL | 0001 |
+| Una petición de información tiene como máximo una respuesta | `UNIQUE` en `solicitud_informacion_id` | 0001 |
+| Un adjunto con mensaje o intervención corresponde a la misma solicitud | Claves foráneas compuestas | 0001 |
+| Valores controlados de rol, tipo, prioridad, estado, tipo de cierre, visibilidad y estado de las peticiones de información | `CHECK` | 0002 |
+| Un adjunto pertenece a un mensaje o a una intervención, no a ambos | `CHECK` | 0002 |
+| El historial no se modifica ni se elimina | Trigger (`UPDATE`, `DELETE` y `TRUNCATE`) | 0002 |
+
+El SQL siguiente corresponde a lo que implementan las migraciones:
 
 ```sql
 -- Secuencia para el número legible (ST-000001)
@@ -232,12 +236,21 @@ ALTER TABLE solicitudes
 CREATE UNIQUE INDEX uq_asignacion_activa
   ON asignaciones (solicitud_id) WHERE fecha_finalizacion IS NULL;
 
--- Valores controlados (ejemplos)
+-- Adjuntos: coherencia con la solicitud del mensaje o de la intervención
+ALTER TABLE mensajes
+  ADD CONSTRAINT uq_mensajes_solicitud UNIQUE (solicitud_id, id);
+ALTER TABLE intervenciones
+  ADD CONSTRAINT uq_intervenciones_solicitud UNIQUE (solicitud_id, id);
+ALTER TABLE adjuntos
+  ADD CONSTRAINT fk_adjuntos_mensaje
+    FOREIGN KEY (solicitud_id, mensaje_id) REFERENCES mensajes (solicitud_id, id),
+  ADD CONSTRAINT fk_adjuntos_intervencion
+    FOREIGN KEY (solicitud_id, intervencion_id) REFERENCES intervenciones (solicitud_id, id);
+
+-- Migración 0002: valores controlados
+-- (prioridad y tipo_cierre aceptan NULL; el CHECK no se viola con NULL)
 ALTER TABLE usuarios
-  ADD CONSTRAINT ck_usuarios_rol CHECK (rol IN ('solicitante', 'tecnico', 'coordinador')),
-  ADD CONSTRAINT ck_usuarios_medio CHECK (medio_contacto_preferido IN ('correo', 'telefono')),
-  ADD CONSTRAINT ck_usuarios_telefono
-    CHECK (medio_contacto_preferido <> 'telefono' OR telefono IS NOT NULL);
+  ADD CONSTRAINT ck_usuarios_rol CHECK (rol IN ('solicitante', 'tecnico', 'coordinador'));
 
 ALTER TABLE solicitudes
   ADD CONSTRAINT ck_solicitudes_tipo CHECK (tipo IN ('incidente', 'requerimiento')),
@@ -247,53 +260,54 @@ ALTER TABLE solicitudes
   ADD CONSTRAINT ck_solicitudes_tipo_cierre
     CHECK (tipo_cierre IN ('solucion', 'cancelacion', 'administrativo'));
 
--- Coherencia del cierre
-ALTER TABLE solicitudes ADD CONSTRAINT ck_solicitudes_cierre CHECK (
-  (estado <> 'cerrado'
-     AND tipo_cierre IS NULL AND motivo_cierre IS NULL
-     AND cerrado_por IS NULL AND fecha_cierre IS NULL)
-  OR
-  (estado = 'cerrado'
-     AND tipo_cierre IS NOT NULL AND cerrado_por IS NOT NULL AND fecha_cierre IS NOT NULL
-     AND (tipo_cierre = 'solucion' OR motivo_cierre IS NOT NULL)
-     AND (tipo_cierre <> 'solucion' OR solucion_final IS NOT NULL))
-);
-
--- Coherencia de la resolución
-ALTER TABLE solicitudes ADD CONSTRAINT ck_solicitudes_resolucion CHECK (
-  (solucion_final IS NULL) = (resuelto_por IS NULL)
-  AND (resuelto_por IS NULL) = (fecha_resolucion IS NULL)
-);
-
--- Adjuntos: un solo origen y coherencia con la solicitud
-ALTER TABLE mensajes
-  ADD CONSTRAINT uq_mensajes_solicitud UNIQUE (solicitud_id, id);
 ALTER TABLE intervenciones
-  ADD CONSTRAINT uq_intervenciones_solicitud UNIQUE (solicitud_id, id);
-ALTER TABLE adjuntos
-  ADD CONSTRAINT ck_adjuntos_un_origen CHECK (mensaje_id IS NULL OR intervencion_id IS NULL),
-  ADD CONSTRAINT ck_adjuntos_tipo CHECK (tipo_archivo IN ('image/png', 'image/jpeg')),
-  ADD CONSTRAINT ck_adjuntos_tamano CHECK (tamano > 0 AND tamano <= 5242880),
-  ADD CONSTRAINT fk_adjuntos_mensaje
-    FOREIGN KEY (solicitud_id, mensaje_id) REFERENCES mensajes (solicitud_id, id),
-  ADD CONSTRAINT fk_adjuntos_intervencion
-    FOREIGN KEY (solicitud_id, intervencion_id) REFERENCES intervenciones (solicitud_id, id);
+  ADD CONSTRAINT ck_intervenciones_visibilidad CHECK (visibilidad IN ('interna', 'solicitante'));
 
--- Historial inmutable
-CREATE FUNCTION bloquear_modificacion() RETURNS trigger LANGUAGE plpgsql AS $$
+ALTER TABLE solicitudes_informacion
+  ADD CONSTRAINT ck_solicitudes_informacion_estado CHECK (estado IN ('pendiente', 'respondida'));
+
+-- Migración 0002: un adjunto tiene mensaje o intervención, no ambos
+-- (con ambos NULL queda ligado solo a la solicitud)
+ALTER TABLE adjuntos
+  ADD CONSTRAINT ck_adjuntos_un_solo_origen CHECK (num_nonnulls(mensaje_id, intervencion_id) <= 1);
+
+-- Migración 0002: historial inmutable
+CREATE FUNCTION fn_historial_inmutable() RETURNS trigger AS $$
 BEGIN
-  RAISE EXCEPTION 'Los registros de % no pueden modificarse ni eliminarse', TG_TABLE_NAME;
+  RAISE EXCEPTION 'historial_cambios es inmutable: no se permite %', TG_OP
+    USING ERRCODE = 'integrity_constraint_violation';
 END;
-$$;
+$$ LANGUAGE plpgsql;
 CREATE TRIGGER tg_historial_inmutable
   BEFORE UPDATE OR DELETE ON historial_cambios
-  FOR EACH ROW EXECUTE FUNCTION bloquear_modificacion();
+  FOR EACH ROW EXECUTE FUNCTION fn_historial_inmutable();
+-- TRUNCATE no dispara triggers por fila; se bloquea con uno por sentencia
+CREATE TRIGGER tg_historial_inmutable_truncate
+  BEFORE TRUNCATE ON historial_cambios
+  FOR EACH STATEMENT EXECUTE FUNCTION fn_historial_inmutable();
 ```
 
 ### 3.2. En el backend
 
-Una clave foránea no puede verificar el rol del usuario ni el estado de la solicitud. Estas reglas se validan en los servicios, dentro de la misma transacción que la operación:
+Una clave foránea no puede verificar el rol del usuario ni el estado de la solicitud, y algunas reglas cambian con frecuencia. Estas reglas se validan en los esquemas Pydantic y en los servicios, dentro de la misma transacción que la operación:
 
+**Coherencia de los datos de la solicitud**
+- Una solicitud cerrada tiene tipo de cierre, responsable (`cerrado_por`) y fecha de cierre; una solicitud no cerrada no tiene ninguno de esos datos ni `motivo_cierre` (RN-35).
+- La cancelación y el cierre administrativo exigen `motivo_cierre`; el cierre por solución exige `solucion_final`.
+- `solucion_final`, `resuelto_por` y `fecha_resolucion` se registran juntos o no se registra ninguno. El endpoint `/resolve` escribe los tres campos y cambia el estado en una misma transacción.
+
+**Coherencia de los datos de contacto**
+- `medio_contacto_preferido` y `medio_contacto` solo aceptan `correo` o `telefono`.
+- Si el medio preferido es `telefono`, el campo `telefono` es obligatorio.
+
+**Adjuntos**
+- Solo se aceptan archivos `image/png` o `image/jpeg`.
+- El tamaño es mayor que 0 y no supera 5 MB (5 242 880 bytes).
+
+**Historial**
+- `historial_cambios.tipo_cambio` solo toma los valores definidos en el diagrama (`creacion`, `cambio_estado`, `cambio_prioridad`, `cambio_categoria`, `asignacion`, `reasignacion`, `solucion`, `cierre_solucion`, `cierre_administrativo`, `cancelacion`).
+
+**Reglas de negocio**
 - `solicitudes.solicitante_id` corresponde a un usuario con rol `solicitante`.
 - `asignaciones.tecnico_id` corresponde a un técnico activo y `asignado_por` a un coordinador.
 - `intervenciones.tecnico_id` es el técnico asignado actualmente a la solicitud.
