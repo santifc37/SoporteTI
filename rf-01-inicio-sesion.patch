@@ -1,0 +1,951 @@
+diff --git a/apps/backend/.env.example b/apps/backend/.env.example
+index 6bfb016..7514ad7 100644
+--- a/apps/backend/.env.example
++++ b/apps/backend/.env.example
+@@ -2,5 +2,10 @@
+ # Supabase - Connect - Session pooler
+ DATABASE_URL=postgresql://postgres.TU_PROJECT_REF:TU_CONTRASENA@aws-0-TU_REGION.pooler.supabase.com:5432/postgres
+ 
++# Sesiones (cookie HttpOnly). En producción: SESSION_COOKIE_SECURE=true.
++SESSION_DURATION_HOURS=8
++SESSION_COOKIE_SECURE=false
++SESSION_COOKIE_SAMESITE=lax
++
+ # Direcciones permitidas del frontend
+ CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+diff --git a/apps/backend/app/api/auth.py b/apps/backend/app/api/auth.py
+new file mode 100644
+index 0000000..7ea32d6
+--- /dev/null
++++ b/apps/backend/app/api/auth.py
+@@ -0,0 +1,81 @@
++from fastapi import APIRouter, Depends, Response
++from sqlalchemy.orm import Session
++
++from app.api.dependencies import UsuarioActual, get_current_user
++from app.core.config import (
++    SESSION_COOKIE_NAME,
++    get_session_cookie_samesite,
++    get_session_cookie_secure,
++    get_session_duration_hours,
++)
++from app.database.session import get_db
++from app.schemas.auth import (
++    LoginPeticion,
++    LoginRespuesta,
++    MensajeRespuesta,
++    MeRespuesta,
++    UsuarioActualDetalle,
++    UsuarioSesion,
++)
++from app.services.autenticacion import cerrar_sesion, iniciar_sesion
++
++router = APIRouter(prefix="/auth", tags=["Autenticación"])
++
++
++@router.post("/login", response_model=LoginRespuesta)
++def login(datos: LoginPeticion, response: Response, db: Session = Depends(get_db)):
++    """Inicia sesión con correo y contraseña (RF-01) y establece la cookie."""
++    usuario, token = iniciar_sesion(db, datos.correo, datos.contrasena)
++
++    response.set_cookie(
++        key=SESSION_COOKIE_NAME,
++        value=token,
++        max_age=get_session_duration_hours() * 3600,
++        httponly=True,
++        secure=get_session_cookie_secure(),
++        samesite=get_session_cookie_samesite(),
++        path="/",
++    )
++    return LoginRespuesta(
++        mensaje="Inicio de sesión exitoso",
++        usuario=UsuarioSesion(
++            id=usuario.id,
++            nombre=usuario.nombre,
++            apellido=usuario.apellido,
++            correo=usuario.correo,
++            rol=usuario.rol,
++        ),
++    )
++
++
++@router.post("/logout", response_model=MensajeRespuesta)
++def logout(
++    response: Response,
++    usuario: UsuarioActual = Depends(get_current_user),
++    db: Session = Depends(get_db),
++):
++    """Revoca la sesión actual y elimina la cookie."""
++    cerrar_sesion(db, usuario.sesion_id)
++    response.delete_cookie(
++        key=SESSION_COOKIE_NAME,
++        path="/",
++        httponly=True,
++        secure=get_session_cookie_secure(),
++        samesite=get_session_cookie_samesite(),
++    )
++    return MensajeRespuesta(mensaje="Sesión cerrada correctamente")
++
++
++@router.get("/me", response_model=MeRespuesta)
++def me(usuario: UsuarioActual = Depends(get_current_user)):
++    """Devuelve el usuario autenticado. Responde 401 si no hay sesión válida."""
++    return MeRespuesta(
++        usuario=UsuarioActualDetalle(
++            id=usuario.id,
++            nombre=usuario.nombre,
++            apellido=usuario.apellido,
++            correo=usuario.correo,
++            rol=usuario.rol,
++            activo=usuario.activo,
++        )
++    )
+diff --git a/apps/backend/app/api/dependencies.py b/apps/backend/app/api/dependencies.py
+new file mode 100644
+index 0000000..4e2d1b4
+--- /dev/null
++++ b/apps/backend/app/api/dependencies.py
+@@ -0,0 +1,52 @@
++"""Dependencias compartidas de la API."""
++
++import uuid
++from dataclasses import dataclass
++
++from fastapi import Cookie, Depends
++from sqlalchemy.orm import Session
++
++from app.core.config import SESSION_COOKIE_NAME
++from app.core.errors import ApiError
++from app.database.session import get_db
++from app.services.autenticacion import obtener_sesion_valida
++
++
++@dataclass(frozen=True)
++class UsuarioActual:
++    """Usuario autenticado de la petición en curso."""
++
++    id: uuid.UUID
++    rol: str
++    nombre: str
++    apellido: str
++    correo: str
++    activo: bool
++    sesion_id: uuid.UUID
++
++
++def get_current_user(
++    token: str | None = Cookie(default=None, alias=SESSION_COOKIE_NAME),
++    db: Session = Depends(get_db),
++) -> UsuarioActual:
++    """Exige una sesión válida y devuelve el usuario autenticado (RNF-05).
++
++    Responde 401 SESION_NO_VALIDA si no hay cookie o la sesión no existe,
++    está revocada o venció.
++    """
++    resultado = obtener_sesion_valida(db, token) if token else None
++    if resultado is None:
++        raise ApiError(
++            401, "SESION_NO_VALIDA", "Debes iniciar sesión para realizar esta operación."
++        )
++
++    sesion, usuario = resultado
++    return UsuarioActual(
++        id=usuario.id,
++        rol=usuario.rol,
++        nombre=usuario.nombre,
++        apellido=usuario.apellido,
++        correo=usuario.correo,
++        activo=usuario.activo,
++        sesion_id=sesion.id,
++    )
+diff --git a/apps/backend/app/api/router.py b/apps/backend/app/api/router.py
+index fdfe620..8751e3b 100644
+--- a/apps/backend/app/api/router.py
++++ b/apps/backend/app/api/router.py
+@@ -1,9 +1,11 @@
+ 
+ from fastapi import APIRouter
+ 
++from app.api.auth import router as auth_router
+ from app.api.health import router as health_router
+ 
+ 
+ api_router = APIRouter()
+ 
+ api_router.include_router(health_router)
++api_router.include_router(auth_router)
+diff --git a/apps/backend/app/core/config.py b/apps/backend/app/core/config.py
+index 9583d59..db9c199 100644
+--- a/apps/backend/app/core/config.py
++++ b/apps/backend/app/core/config.py
+@@ -33,6 +33,33 @@ def get_database_url() -> str:
+     return database_url
+ 
+ 
++SESSION_COOKIE_NAME = "soporteti_session"
++
++
++def get_session_duration_hours() -> int:
++    """Duración de una sesión en horas (SESSION_DURATION_HOURS, 8 por defecto)."""
++    try:
++        horas = int(os.getenv("SESSION_DURATION_HOURS", "8"))
++    except ValueError:
++        return 8
++    return horas if horas > 0 else 8
++
++
++def get_session_cookie_secure() -> bool:
++    """La cookie solo viaja por HTTPS cuando es true. Activar en producción."""
++    return os.getenv("SESSION_COOKIE_SECURE", "false").strip().lower() == "true"
++
++
++def get_session_cookie_samesite() -> str:
++    """Atributo SameSite de la cookie: lax (por defecto), strict o none.
++
++    `none` exige SESSION_COOKIE_SECURE=true y solo se necesita si frontend y
++    backend están en sitios distintos.
++    """
++    valor = os.getenv("SESSION_COOKIE_SAMESITE", "lax").strip().lower()
++    return valor if valor in {"lax", "strict", "none"} else "lax"
++
++
+ def get_cors_origins() -> list[str]:
+     """Obtiene los orígenes permitidos para el frontend."""
+     origins = os.getenv(
+diff --git a/apps/backend/app/core/errors.py b/apps/backend/app/core/errors.py
+new file mode 100644
+index 0000000..e1de15d
+--- /dev/null
++++ b/apps/backend/app/core/errors.py
+@@ -0,0 +1,40 @@
++from typing import Any
++
++from fastapi import FastAPI, Request
++from fastapi.responses import JSONResponse
++
++
++class ApiError(Exception):
++    """Error de negocio con el formato de docs/contrato-api.md §18.
++
++    Ejemplo de respuesta:
++        {"error": {"codigo": "...", "mensaje": "...", "detalles": null}}
++    """
++
++    def __init__(
++        self,
++        status_code: int,
++        codigo: str,
++        mensaje: str,
++        detalles: Any = None,
++    ) -> None:
++        super().__init__(mensaje)
++        self.status_code = status_code
++        self.codigo = codigo
++        self.mensaje = mensaje
++        self.detalles = detalles
++
++
++def register_error_handlers(app: FastAPI) -> None:
++    @app.exception_handler(ApiError)
++    async def api_error_handler(_request: Request, exc: ApiError) -> JSONResponse:
++        return JSONResponse(
++            status_code=exc.status_code,
++            content={
++                "error": {
++                    "codigo": exc.codigo,
++                    "mensaje": exc.mensaje,
++                    "detalles": exc.detalles,
++                }
++            },
++        )
+diff --git a/apps/backend/app/core/security.py b/apps/backend/app/core/security.py
+new file mode 100644
+index 0000000..33ae20e
+--- /dev/null
++++ b/apps/backend/app/core/security.py
+@@ -0,0 +1,46 @@
++"""Hash de contraseñas y tokens de sesión (RNF-04, docs/diseno.md §9).
++
++- Contraseñas: Argon2id (algoritmo de hash pensado para contraseñas). Nunca se
++  guardan en texto plano.
++- Sesiones: el navegador recibe un token aleatorio; en la base de datos solo se
++  guarda su hash SHA-256 (`sesiones.token_hash`), así que una filtración de la
++  tabla no permite usar las sesiones.
++"""
++
++import hashlib
++import secrets
++
++from argon2 import PasswordHasher
++from argon2.exceptions import InvalidHashError, VerificationError
++
++_hasher = PasswordHasher()
++
++
++def hash_password(contrasena: str) -> str:
++    return _hasher.hash(contrasena)
++
++
++def verify_password(contrasena: str, password_hash: str) -> bool:
++    try:
++        return _hasher.verify(password_hash, contrasena)
++    except (VerificationError, InvalidHashError):
++        return False
++
++
++def password_needs_rehash(password_hash: str) -> bool:
++    """True si el hash usa parámetros antiguos y conviene regenerarlo."""
++    return _hasher.check_needs_rehash(password_hash)
++
++
++def generate_session_token() -> str:
++    """Token aleatorio de 256 bits que viaja en la cookie."""
++    return secrets.token_urlsafe(32)
++
++
++def hash_session_token(token: str) -> str:
++    return hashlib.sha256(token.encode("utf-8")).hexdigest()
++
++
++# Hash de una contraseña inexistente: permite hacer el mismo trabajo de
++# verificación cuando el correo no existe y no revelar así qué cuentas existen.
++HASH_FICTICIO = hash_password("contrasena-ficticia-no-usar")
+diff --git a/apps/backend/app/main.py b/apps/backend/app/main.py
+index ea122e9..b4afe87 100644
+--- a/apps/backend/app/main.py
++++ b/apps/backend/app/main.py
+@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
+ 
+ from app.api.router import api_router
+ from app.core.config import get_cors_origins
++from app.core.errors import register_error_handlers
+ 
+ 
+ app = FastAPI(
+@@ -13,6 +14,9 @@ app = FastAPI(
+ )
+ 
+ 
++register_error_handlers(app)
++
++
+ app.add_middleware(
+     CORSMiddleware,
+     allow_origins=get_cors_origins(),
+diff --git a/apps/backend/app/models/__init__.py b/apps/backend/app/models/__init__.py
+index e69de29..f3412ce 100644
+--- a/apps/backend/app/models/__init__.py
++++ b/apps/backend/app/models/__init__.py
+@@ -0,0 +1,5 @@
++from app.models.base import Base
++from app.models.sesion import Sesion
++from app.models.usuario import Usuario
++
++__all__ = ["Base", "Sesion", "Usuario"]
+diff --git a/apps/backend/app/models/base.py b/apps/backend/app/models/base.py
+new file mode 100644
+index 0000000..df2e639
+--- /dev/null
++++ b/apps/backend/app/models/base.py
+@@ -0,0 +1,9 @@
++from sqlalchemy.orm import DeclarativeBase
++
++
++class Base(DeclarativeBase):
++    """Clase base de los modelos SQLAlchemy.
++
++    El esquema real lo gestiona Alembic (alembic/versions/); los modelos solo
++    describen las tablas existentes para poder consultarlas desde los servicios.
++    """
+diff --git a/apps/backend/app/models/sesion.py b/apps/backend/app/models/sesion.py
+new file mode 100644
+index 0000000..4917755
+--- /dev/null
++++ b/apps/backend/app/models/sesion.py
+@@ -0,0 +1,22 @@
++import uuid
++from datetime import datetime
++
++from sqlalchemy import Boolean, DateTime, ForeignKey, String, Uuid, func
++from sqlalchemy.orm import Mapped, mapped_column
++
++from app.models.base import Base
++
++
++class Sesion(Base):
++    """Tabla `sesiones` (docs/MER.md). Guarda solo el hash del token."""
++
++    __tablename__ = "sesiones"
++
++    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
++    usuario_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("usuarios.id"))
++    token_hash: Mapped[str] = mapped_column(String(255), unique=True)
++    fecha_creacion: Mapped[datetime] = mapped_column(
++        DateTime(timezone=True), server_default=func.now()
++    )
++    fecha_expiracion: Mapped[datetime] = mapped_column(DateTime(timezone=True))
++    revocada: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+diff --git a/apps/backend/app/models/usuario.py b/apps/backend/app/models/usuario.py
+new file mode 100644
+index 0000000..061f1a0
+--- /dev/null
++++ b/apps/backend/app/models/usuario.py
+@@ -0,0 +1,31 @@
++import uuid
++from datetime import datetime
++
++from sqlalchemy import Boolean, DateTime, String, Uuid, func
++from sqlalchemy.orm import Mapped, mapped_column
++
++from app.models.base import Base
++
++
++class Usuario(Base):
++    """Tabla `usuarios` (docs/MER.md)."""
++
++    __tablename__ = "usuarios"
++
++    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
++    nombre: Mapped[str] = mapped_column(String(100))
++    apellido: Mapped[str] = mapped_column(String(100))
++    correo: Mapped[str] = mapped_column(String(255))
++    password_hash: Mapped[str] = mapped_column(String(255))
++    rol: Mapped[str] = mapped_column(String(20))
++    activo: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
++    medio_contacto_preferido: Mapped[str] = mapped_column(
++        String(20), default="correo", server_default="correo"
++    )
++    telefono: Mapped[str | None] = mapped_column(String(20))
++    fecha_creacion: Mapped[datetime] = mapped_column(
++        DateTime(timezone=True), server_default=func.now()
++    )
++    fecha_actualizacion: Mapped[datetime] = mapped_column(
++        DateTime(timezone=True), server_default=func.now()
++    )
+diff --git a/apps/backend/app/schemas/auth.py b/apps/backend/app/schemas/auth.py
+new file mode 100644
+index 0000000..7ffe104
+--- /dev/null
++++ b/apps/backend/app/schemas/auth.py
+@@ -0,0 +1,35 @@
++import uuid
++
++from pydantic import BaseModel, Field
++
++
++class LoginPeticion(BaseModel):
++    correo: str = Field(min_length=1, max_length=255)
++    contrasena: str = Field(min_length=1, max_length=128)
++
++
++class UsuarioSesion(BaseModel):
++    """Datos del usuario que se devuelven al iniciar sesión."""
++
++    id: uuid.UUID
++    nombre: str
++    apellido: str
++    correo: str
++    rol: str
++
++
++class LoginRespuesta(BaseModel):
++    mensaje: str
++    usuario: UsuarioSesion
++
++
++class UsuarioActualDetalle(UsuarioSesion):
++    activo: bool
++
++
++class MeRespuesta(BaseModel):
++    usuario: UsuarioActualDetalle
++
++
++class MensajeRespuesta(BaseModel):
++    mensaje: str
+diff --git a/apps/backend/app/services/autenticacion.py b/apps/backend/app/services/autenticacion.py
+new file mode 100644
+index 0000000..21a9a5f
+--- /dev/null
++++ b/apps/backend/app/services/autenticacion.py
+@@ -0,0 +1,90 @@
++import uuid
++from datetime import datetime, timedelta, timezone
++
++from sqlalchemy import func, select
++from sqlalchemy.orm import Session
++
++from app.core.config import get_session_duration_hours
++from app.core.errors import ApiError
++from app.core.security import (
++    HASH_FICTICIO,
++    generate_session_token,
++    hash_password,
++    hash_session_token,
++    password_needs_rehash,
++    verify_password,
++)
++from app.models import Sesion, Usuario
++
++
++def _ahora() -> datetime:
++    return datetime.now(timezone.utc)
++
++
++def iniciar_sesion(db: Session, correo: str, contrasena: str) -> tuple[Usuario, str]:
++    """RF-01: valida las credenciales y crea una sesión.
++
++    Devuelve el usuario y el token en claro, que solo se entrega una vez (en
++    la cookie). Por seguridad, un correo inexistente y una contraseña
++    incorrecta producen exactamente el mismo error.
++    """
++    usuario = db.scalar(
++        select(Usuario).where(func.lower(Usuario.correo) == correo.strip().lower())
++    )
++
++    # Se verifica siempre una contraseña, exista o no el usuario.
++    contrasena_valida = verify_password(
++        contrasena, usuario.password_hash if usuario else HASH_FICTICIO
++    )
++    if usuario is None or not contrasena_valida:
++        raise ApiError(401, "CREDENCIALES_INVALIDAS", "Correo o contraseña incorrectos.")
++
++    # Solo se informa de la cuenta desactivada a quien conoce la contraseña.
++    if not usuario.activo:
++        raise ApiError(401, "USUARIO_INACTIVO", "La cuenta está desactivada.")
++
++    if password_needs_rehash(usuario.password_hash):
++        usuario.password_hash = hash_password(contrasena)
++
++    token = generate_session_token()
++    db.add(
++        Sesion(
++            usuario_id=usuario.id,
++            token_hash=hash_session_token(token),
++            fecha_expiracion=_ahora() + timedelta(hours=get_session_duration_hours()),
++        )
++    )
++    db.commit()
++    return usuario, token
++
++
++def obtener_sesion_valida(db: Session, token: str) -> tuple[Sesion, Usuario] | None:
++    """Devuelve (sesión, usuario) si el token corresponde a una sesión vigente.
++
++    Una sesión es vigente si no está revocada ni vencida. Si la cuenta está
++    desactivada se lanza USUARIO_INACTIVO.
++    """
++    fila = db.execute(
++        select(Sesion, Usuario)
++        .join(Usuario, Usuario.id == Sesion.usuario_id)
++        .where(
++            Sesion.token_hash == hash_session_token(token),
++            Sesion.revocada.is_(False),
++            Sesion.fecha_expiracion > _ahora(),
++        )
++    ).first()
++    if fila is None:
++        return None
++
++    sesion, usuario = fila
++    if not usuario.activo:
++        raise ApiError(401, "USUARIO_INACTIVO", "La cuenta está desactivada.")
++    return sesion, usuario
++
++
++def cerrar_sesion(db: Session, sesion_id: uuid.UUID) -> None:
++    """Revoca la sesión indicada (no se borra: queda como histórico)."""
++    sesion = db.get(Sesion, sesion_id)
++    if sesion is not None and not sesion.revocada:
++        sesion.revocada = True
++        db.commit()
+diff --git a/apps/backend/requirements.txt b/apps/backend/requirements.txt
+index 63babce..c1c1755 100644
+--- a/apps/backend/requirements.txt
++++ b/apps/backend/requirements.txt
+@@ -5,4 +5,5 @@ sqlalchemy
+ psycopg[binary]
+ python-dotenv
+ pytest
+-httpx
+\ No newline at end of file
++httpx
++argon2-cffi
+\ No newline at end of file
+diff --git a/apps/backend/scripts/__init__.py b/apps/backend/scripts/__init__.py
+new file mode 100644
+index 0000000..e69de29
+diff --git a/apps/backend/scripts/crear_usuario.py b/apps/backend/scripts/crear_usuario.py
+new file mode 100644
+index 0000000..5ee6017
+--- /dev/null
++++ b/apps/backend/scripts/crear_usuario.py
+@@ -0,0 +1,70 @@
++"""Crea un usuario directamente en la base de datos.
++
++No hay registro público (RN-02) y todavía no existe la gestión de usuarios del
++coordinador (RF-03), así que este script sirve para crear la primera cuenta de
++coordinador y las cuentas de prueba.
++
++Uso, desde apps/backend y con el entorno virtual activado:
++
++    python -m scripts.crear_usuario Ana Perez ana@organizacion.com coordinador
++
++La contraseña se pide por teclado (no queda en el historial de la terminal).
++Roles: solicitante, tecnico, coordinador.
++"""
++
++import argparse
++import getpass
++import sys
++
++from sqlalchemy import func, select
++from sqlalchemy.orm import Session
++
++from app.core.security import hash_password
++from app.database.session import get_engine
++from app.models import Usuario
++
++ROLES = ("solicitante", "tecnico", "coordinador")
++LONGITUD_MINIMA = 8
++
++
++def main() -> int:
++    parser = argparse.ArgumentParser(description="Crear un usuario de SoporteTI.")
++    parser.add_argument("nombre")
++    parser.add_argument("apellido")
++    parser.add_argument("correo")
++    parser.add_argument("rol", choices=ROLES)
++    args = parser.parse_args()
++
++    contrasena = getpass.getpass("Contraseña: ")
++    if len(contrasena) < LONGITUD_MINIMA:
++        print(f"La contraseña debe tener al menos {LONGITUD_MINIMA} caracteres.")
++        return 1
++    if contrasena != getpass.getpass("Repite la contraseña: "):
++        print("Las contraseñas no coinciden.")
++        return 1
++
++    with Session(get_engine()) as db:
++        existe = db.scalar(
++            select(Usuario.id).where(func.lower(Usuario.correo) == args.correo.strip().lower())
++        )
++        if existe:
++            print("Ya existe un usuario con ese correo.")
++            return 1
++
++        db.add(
++            Usuario(
++                nombre=args.nombre,
++                apellido=args.apellido,
++                correo=args.correo.strip(),
++                password_hash=hash_password(contrasena),
++                rol=args.rol,
++            )
++        )
++        db.commit()
++
++    print(f"Usuario {args.correo} creado con el rol {args.rol}.")
++    return 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+diff --git a/apps/backend/tests/test_rf01_inicio_sesion.py b/apps/backend/tests/test_rf01_inicio_sesion.py
+new file mode 100644
+index 0000000..c8358e8
+--- /dev/null
++++ b/apps/backend/tests/test_rf01_inicio_sesion.py
+@@ -0,0 +1,292 @@
++"""Pruebas de RF-01 (inicio y cierre de sesión) y RNF-04 (hash de contraseñas).
++
++Usan SQLite en memoria; no tocan Supabase.
++"""
++
++import uuid
++from datetime import datetime, timedelta, timezone
++
++import pytest
++from fastapi.testclient import TestClient
++from sqlalchemy import create_engine, select
++from sqlalchemy.orm import Session
++from sqlalchemy.pool import StaticPool
++
++from app.core.config import SESSION_COOKIE_NAME
++from app.core.security import (
++    hash_password,
++    hash_session_token,
++    password_needs_rehash,
++    verify_password,
++)
++from app.database.session import get_db
++from app.main import app
++from app.models import Base, Sesion, Usuario
++
++LOGIN = "/api/v1/auth/login"
++LOGOUT = "/api/v1/auth/logout"
++ME = "/api/v1/auth/me"
++CONTRASENA = "Contrasena123"
++
++
++@pytest.fixture()
++def db():
++    engine = create_engine(
++        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
++    )
++    Base.metadata.create_all(engine)
++    with Session(engine) as session:
++        yield session
++    engine.dispose()
++
++
++@pytest.fixture()
++def client(db):
++    app.dependency_overrides[get_db] = lambda: db
++    yield TestClient(app)
++    app.dependency_overrides.clear()
++
++
++@pytest.fixture()
++def usuario(db):
++    u = Usuario(
++        nombre="Juan",
++        apellido="Pérez",
++        correo="Juan@Organizacion.com",
++        password_hash=hash_password(CONTRASENA),
++        rol="tecnico",
++    )
++    db.add(u)
++    db.commit()
++    return u
++
++
++def iniciar(client, correo="juan@organizacion.com", contrasena=CONTRASENA):
++    return client.post(LOGIN, json={"correo": correo, "contrasena": contrasena})
++
++
++# ----------------------------- inicio de sesión ------------------------------
++
++
++def test_login_correcto_devuelve_usuario_y_cookie(client, usuario):
++    respuesta = iniciar(client)
++
++    assert respuesta.status_code == 200
++    cuerpo = respuesta.json()
++    assert cuerpo["mensaje"] == "Inicio de sesión exitoso"
++    assert cuerpo["usuario"] == {
++        "id": str(usuario.id),
++        "nombre": "Juan",
++        "apellido": "Pérez",
++        "correo": "Juan@Organizacion.com",
++        "rol": "tecnico",
++    }
++    assert SESSION_COOKIE_NAME in respuesta.cookies
++
++
++def test_la_respuesta_no_expone_contrasena_ni_hash(client, usuario):
++    texto = iniciar(client).text
++
++    assert CONTRASENA not in texto
++    assert "password" not in texto
++    assert usuario.password_hash not in texto
++
++
++def test_cookie_es_httponly_con_samesite_y_duracion(client, usuario):
++    cabecera = iniciar(client).headers["set-cookie"].lower()
++
++    assert "httponly" in cabecera
++    assert "samesite=lax" in cabecera
++    assert "max-age=28800" in cabecera  # 8 horas por defecto
++    assert "secure" not in cabecera  # solo con SESSION_COOKIE_SECURE=true
++
++
++def test_cookie_secure_se_activa_por_configuracion(client, usuario, monkeypatch):
++    monkeypatch.setenv("SESSION_COOKIE_SECURE", "true")
++
++    assert "secure" in iniciar(client).headers["set-cookie"].lower()
++
++
++def test_en_la_base_solo_se_guarda_el_hash_del_token(client, db, usuario):
++    token = iniciar(client).cookies[SESSION_COOKIE_NAME]
++
++    sesion = db.scalar(select(Sesion))
++    assert sesion.token_hash != token
++    assert sesion.token_hash == hash_session_token(token)
++    assert len(sesion.token_hash) == 64
++    assert sesion.usuario_id == usuario.id
++    assert sesion.revocada is False
++
++
++def test_el_correo_no_distingue_mayusculas(client, usuario):
++    assert iniciar(client, correo="  JUAN@ORGANIZACION.COM ").status_code == 200
++
++
++def test_contrasena_incorrecta_devuelve_401(client, usuario):
++    respuesta = iniciar(client, contrasena="otra")
++
++    assert respuesta.status_code == 401
++    assert respuesta.json()["error"]["codigo"] == "CREDENCIALES_INVALIDAS"
++    assert SESSION_COOKIE_NAME not in respuesta.cookies
++
++
++def test_correo_inexistente_da_el_mismo_error_que_contrasena_incorrecta(client, usuario):
++    inexistente = iniciar(client, correo="nadie@organizacion.com")
++    incorrecta = iniciar(client, contrasena="otra")
++
++    assert inexistente.status_code == incorrecta.status_code == 401
++    assert inexistente.json() == incorrecta.json()
++
++
++def test_cuenta_desactivada_no_puede_iniciar_sesion(client, db, usuario):
++    usuario.activo = False
++    db.commit()
++
++    respuesta = iniciar(client)
++
++    assert respuesta.status_code == 401
++    assert respuesta.json()["error"]["codigo"] == "USUARIO_INACTIVO"
++    assert db.scalar(select(Sesion)) is None
++
++
++def test_cuenta_desactivada_con_contrasena_incorrecta_no_revela_su_estado(client, db, usuario):
++    usuario.activo = False
++    db.commit()
++
++    respuesta = iniciar(client, contrasena="otra")
++
++    assert respuesta.json()["error"]["codigo"] == "CREDENCIALES_INVALIDAS"
++
++
++@pytest.mark.parametrize("cuerpo", [{}, {"correo": "a@b.com"}, {"contrasena": "x"}])
++def test_login_con_campos_faltantes_devuelve_422(client, cuerpo):
++    assert client.post(LOGIN, json=cuerpo).status_code == 422
++
++
++# ----------------------------- usuario autenticado ---------------------------
++
++
++def test_me_con_sesion_valida(client, usuario):
++    iniciar(client)
++
++    respuesta = client.get(ME)
++
++    assert respuesta.status_code == 200
++    assert respuesta.json()["usuario"]["correo"] == "Juan@Organizacion.com"
++    assert respuesta.json()["usuario"]["activo"] is True
++
++
++def test_me_sin_sesion_devuelve_401(client):
++    respuesta = client.get(ME)
++
++    assert respuesta.status_code == 401
++    assert respuesta.json()["error"]["codigo"] == "SESION_NO_VALIDA"
++
++
++def test_me_con_token_inventado_devuelve_401(client, usuario):
++    client.cookies.set(SESSION_COOKIE_NAME, "token-inventado")
++
++    assert client.get(ME).status_code == 401
++
++
++def test_sesion_vencida_devuelve_401(client, db, usuario):
++    iniciar(client)
++    sesion = db.scalar(select(Sesion))
++    sesion.fecha_expiracion = datetime.now(timezone.utc) - timedelta(minutes=1)
++    db.commit()
++
++    assert client.get(ME).status_code == 401
++
++
++def test_sesion_revocada_devuelve_401(client, db, usuario):
++    iniciar(client)
++    sesion = db.scalar(select(Sesion))
++    sesion.revocada = True
++    db.commit()
++
++    assert client.get(ME).status_code == 401
++
++
++def test_desactivar_la_cuenta_invalida_la_sesion_abierta(client, db, usuario):
++    iniciar(client)
++    usuario.activo = False
++    db.commit()
++
++    respuesta = client.get(ME)
++
++    assert respuesta.status_code == 401
++    assert respuesta.json()["error"]["codigo"] == "USUARIO_INACTIVO"
++
++
++# ------------------------------ cierre de sesión -----------------------------
++
++
++def test_logout_revoca_la_sesion_aunque_se_reutilice_el_token(client, db, usuario):
++    token = iniciar(client).cookies[SESSION_COOKIE_NAME]
++
++    respuesta = client.post(LOGOUT)
++
++    assert respuesta.status_code == 200
++    assert respuesta.json() == {"mensaje": "Sesión cerrada correctamente"}
++    assert db.scalar(select(Sesion)).revocada is True
++
++    # Aunque alguien conserve el token, ya no sirve.
++    client.cookies.clear()
++    client.cookies.set(SESSION_COOKIE_NAME, token)
++    assert client.get(ME).status_code == 401
++
++
++def test_logout_elimina_la_cookie(client, usuario):
++    iniciar(client)
++
++    cabecera = client.post(LOGOUT).headers["set-cookie"].lower()
++
++    assert SESSION_COOKIE_NAME in cabecera
++    assert "max-age=0" in cabecera
++
++
++def test_logout_sin_sesion_devuelve_401(client):
++    assert client.post(LOGOUT).status_code == 401
++
++
++def test_cerrar_una_sesion_no_afecta_a_las_otras(client, db, usuario):
++    primera = TestClient(app)
++    iniciar(primera)
++    iniciar(client)
++
++    client.post(LOGOUT)
++
++    assert primera.get(ME).status_code == 200
++
++
++# ----------------------- hash de contraseñas y tokens (RNF-04) ---------------
++
++
++def test_el_hash_no_es_la_contrasena_y_es_distinto_cada_vez():
++    primero, segundo = hash_password(CONTRASENA), hash_password(CONTRASENA)
++
++    assert CONTRASENA not in primero
++    assert primero.startswith("$argon2id$")
++    assert primero != segundo
++
++
++def test_verificar_contrasena():
++    hash_guardado = hash_password(CONTRASENA)
++
++    assert verify_password(CONTRASENA, hash_guardado) is True
++    assert verify_password("otra", hash_guardado) is False
++    assert verify_password(CONTRASENA, "no-es-un-hash") is False
++    assert password_needs_rehash(hash_guardado) is False
++
++
++def test_hash_del_token_es_determinista():
++    assert hash_session_token("abc") == hash_session_token("abc")
++    assert hash_session_token("abc") != hash_session_token("abd")
++
++
++def test_cada_login_genera_un_token_distinto(client, usuario):
++    primero = iniciar(client).cookies[SESSION_COOKIE_NAME]
++    segundo = iniciar(TestClient(app)).cookies[SESSION_COOKIE_NAME]
++
++    assert primero != segundo
++    assert uuid.UUID(str(usuario.id))  # el id sigue siendo un UUID válido
