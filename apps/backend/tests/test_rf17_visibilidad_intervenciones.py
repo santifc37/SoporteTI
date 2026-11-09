@@ -296,3 +296,59 @@ def test_solicitud_sin_intervenciones_devuelve_lista_vacia(
 
     assert respuesta.status_code == 200
     assert respuesta.json()["data"] == []
+
+
+def test_rf21_consulta_intervenciones_segun_permisos_y_visibilidad(
+    client, db, escenario
+):
+    solicitud = crear_solicitud(
+        db, escenario["solicitante"], escenario["tecnico"]
+    )
+
+    crear_intervencion(
+        db,
+        solicitud,
+        escenario["tecnico"],
+        "Diagnóstico interno del equipo.",
+        "interna",
+        datetime(2026, 1, 1, tzinfo=timezone.utc),
+    )
+    crear_intervencion(
+        db,
+        solicitud,
+        escenario["tecnico"],
+        "Se verificó el funcionamiento del equipo.",
+        "solicitante",
+        datetime(2026, 1, 2, tzinfo=timezone.utc),
+    )
+
+    # El solicitante solo consulta la intervención visible.
+    como(escenario["solicitante"])
+    respuesta_solicitante = client.get(
+        f"{URL}/{solicitud.id}/interventions"
+    )
+
+    assert respuesta_solicitante.status_code == 200
+    assert len(respuesta_solicitante.json()["data"]) == 1
+    assert (
+        respuesta_solicitante.json()["data"][0]["visibilidad"]
+        == "solicitante"
+    )
+
+    # El técnico asignado consulta ambas intervenciones.
+    como(escenario["tecnico"])
+    respuesta_tecnico = client.get(
+        f"{URL}/{solicitud.id}/interventions"
+    )
+
+    assert respuesta_tecnico.status_code == 200
+    assert len(respuesta_tecnico.json()["data"]) == 2
+
+    # El coordinador también consulta ambas intervenciones.
+    como(escenario["coordinador"])
+    respuesta_coordinador = client.get(
+        f"{URL}/{solicitud.id}/interventions"
+    )
+
+    assert respuesta_coordinador.status_code == 200
+    assert len(respuesta_coordinador.json()["data"]) == 2
