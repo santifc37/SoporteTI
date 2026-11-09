@@ -5,8 +5,10 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.schemas.intervencion import CrearIntervencion, IntervencionRespuesta
-from app.services.intervenciones import registrar_intervencion
+
+
+from app.schemas.intervencion import CrearIntervencion, IntervencionRespuesta,IntervencionesRespuesta
+from app.services.intervenciones import registrar_intervencion,consultar_intervenciones
 
 from app.api.dependencies import UsuarioActual, get_current_user
 from app.core.errors import ApiError
@@ -134,3 +136,22 @@ def crear_intervencion(
         tecnico_id=usuario.id,
         datos=datos,
     )
+
+
+@router.get(
+    "/requests/{solicitud_id}/interventions",
+    response_model=IntervencionesRespuesta,
+)
+def obtener_intervenciones(
+    solicitud_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    usuario: UsuarioActual = Depends(get_current_user),
+):
+    intervenciones = consultar_intervenciones(
+        db=db,
+        solicitud_id=solicitud_id,
+        usuario_id=usuario.id,
+        rol=usuario.rol,
+    )
+
+    return {"data": intervenciones}

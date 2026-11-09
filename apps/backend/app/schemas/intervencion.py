@@ -35,3 +35,17 @@ class IntervencionRespuesta(BaseModel):
     diagnostico: str | None
     visibilidad: VisibilidadIntervencion
     fecha_registro: datetime
+
+
+class IntervencionConsulta(BaseModel):
+    id: uuid.UUID
+    tecnico_id: uuid.UUID
+    tecnico_nombre: str
+    descripcion: str
+    diagnostico: str | None
+    visibilidad: VisibilidadIntervencion
+    fecha_registro: datetime
+
+
+class IntervencionesRespuesta(BaseModel):
+    data: list[IntervencionConsulta]
