@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, aliased
 
+from app.schemas.solucion import RegistrarSolucion
+
 from app.core.errors import ApiError
 from app.models import Asignacion, Categoria, Solicitud, Usuario
 from app.models.historial_cambio import HistorialCambio
@@ -194,6 +196,81 @@ def actualizar_estado_solicitud(
             tipo_cambio="cambio_estado",
             valor_anterior=estado_anterior,
             valor_nuevo=nuevo_estado,
+        )
+
+        db.add(historial)
+        db.commit()
+        db.refresh(solicitud)
+
+        return solicitud, estado_anterior
+
+    except Exception:
+        db.rollback()
+        raise
+
+
+def registrar_solucion(
+    db: Session,
+    solicitud_id: uuid.UUID,
+    tecnico_id: uuid.UUID,
+    datos: RegistrarSolucion,
+) -> tuple[Solicitud, str]:
+    """RF-19: registra la solución y marca la solicitud como resuelta."""
+
+    solicitud = db.scalar(
+        select(Solicitud)
+        .where(Solicitud.id == solicitud_id)
+        .with_for_update()
+    )
+
+    if solicitud is None:
+        raise ApiError(
+            404,
+            "SOLICITUD_NO_ENCONTRADA",
+            "La solicitud indicada no existe.",
+        )
+
+    asignacion = db.scalar(
+        select(Asignacion)
+        .where(
+            Asignacion.solicitud_id == solicitud_id,
+            Asignacion.tecnico_id == tecnico_id,
+            Asignacion.fecha_finalizacion.is_(None),
+        )
+        .with_for_update()
+    )
+
+    if asignacion is None:
+        raise ApiError(
+            403,
+            "SIN_PERMISO",
+            "No tienes una asignación activa para esta solicitud.",
+        )
+
+    if solicitud.estado not in {"en_atencion", "en_espera"}:
+        raise ApiError(
+            409,
+            "TRANSICION_NO_PERMITIDA",
+            "Solo se puede registrar una solución cuando la solicitud está en atención o en espera.",
+        )
+
+    estado_anterior = solicitud.estado
+    fecha_resolucion = datetime.now(timezone.utc)
+
+    try:
+        solicitud.estado = "resuelto"
+        solicitud.solucion_final = datos.solucion
+        solicitud.resuelto_por = tecnico_id
+        solicitud.fecha_resolucion = fecha_resolucion
+        solicitud.fecha_actualizacion = fecha_resolucion
+        solicitud.version += 1
+
+        historial = HistorialCambio(
+            solicitud_id=solicitud.id,
+            usuario_id=tecnico_id,
+            tipo_cambio="solucion",
+            valor_anterior=estado_anterior,
+            valor_nuevo=datos.solucion,
         )
 
         db.add(historial)
