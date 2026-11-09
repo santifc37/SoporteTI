@@ -5,6 +5,9 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
+from app.schemas.intervencion import CrearIntervencion, IntervencionRespuesta
+from app.services.intervenciones import registrar_intervencion
+
 from app.api.dependencies import UsuarioActual, get_current_user
 from app.core.errors import ApiError
 from app.database.session import get_db
@@ -106,3 +109,28 @@ def cambiar_estado_solicitud(
             "fecha_actualizacion": solicitud.fecha_actualizacion,
         },
     }
+
+@router.post(
+    "/requests/{solicitud_id}/interventions",
+    response_model=IntervencionRespuesta,
+    status_code=201,
+)
+def crear_intervencion(
+    solicitud_id: uuid.UUID,
+    datos: CrearIntervencion,
+    db: Session = Depends(get_db),
+    usuario: UsuarioActual = Depends(get_current_user),
+):
+    if usuario.rol != "tecnico":
+        raise ApiError(
+            403,
+            "SIN_PERMISO",
+            "Solo los técnicos pueden registrar intervenciones.",
+        )
+
+    return registrar_intervencion(
+        db=db,
+        solicitud_id=solicitud_id,
+        tecnico_id=usuario.id,
+        datos=datos,
+    )
