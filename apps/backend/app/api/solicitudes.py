@@ -5,7 +5,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-
+from app.schemas.solucion import RegistrarSolucion
 
 from app.schemas.solicitud_informacion import (
     CrearSolicitudInformacion,
@@ -30,6 +30,7 @@ from app.services.solicitudes import (
     FiltrosSolicitudes,
     actualizar_estado_solicitud,
     listar_solicitudes_asignadas,
+    registrar_solucion,
 )
 
 router = APIRouter(tags=["Solicitudes"])
@@ -192,4 +193,41 @@ def crear_peticion_informacion(
     return {
         "mensaje": "Solicitud de información registrada correctamente",
         "solicitud_informacion": SolicitudInformacionRespuesta.model_validate(peticion),
+    }
+
+
+@router.post("/requests/{solicitud_id}/resolve")
+def resolver_solicitud(
+    solicitud_id: uuid.UUID,
+    datos: RegistrarSolucion,
+    db: Session = Depends(get_db),
+    usuario: UsuarioActual = Depends(get_current_user),
+):
+    """RF-19: permite al técnico asignado registrar la solución."""
+
+    if usuario.rol != "tecnico":
+        raise ApiError(
+            403,
+            "SIN_PERMISO",
+            "Solo los técnicos pueden registrar la solución.",
+        )
+
+    solicitud, estado_anterior = registrar_solucion(
+        db=db,
+        solicitud_id=solicitud_id,
+        tecnico_id=usuario.id,
+        datos=datos,
+    )
+
+    return {
+        "mensaje": "Solución registrada correctamente",
+        "solicitud": {
+            "id": solicitud.id,
+            "estado_anterior": estado_anterior,
+            "estado_actual": solicitud.estado,
+            "solucion_final": solicitud.solucion_final,
+            "resuelto_por": solicitud.resuelto_por,
+            "fecha_resolucion": solicitud.fecha_resolucion,
+            "fecha_actualizacion": solicitud.fecha_actualizacion,
+        },
     }
