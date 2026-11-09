@@ -1,0 +1,34 @@
+# Matriz de trazabilidad — SoporteTI
+
+Esta matriz relaciona las condiciones de aceptación del proyecto con los requisitos funcionales aprobados, los componentes implementados, los Pull Requests y las pruebas realizadas.
+
+La matriz se actualizará progresivamente durante el desarrollo y la integración de los módulos. Una funcionalidad solo se considerará completada cuando exista evidencia de su implementación y validación.
+
+## 1. Matriz de trazabilidad
+
+| Condición | Requisito aprobado | Implementación (ruta/componente) | Pull request | Prueba |
+|---|---|---|---|---|
+| CA-01 | RF-01: Inicio de sesión. RF-02: Control de acceso por roles. RF-03: Administración de usuarios. RF-04: Cambio y restablecimiento de contraseña. RF-05: Gestión de datos de contacto. | Pendiente de completar con la implementación integrada de autenticación y administración de usuarios. | Pendiente | Pendiente de consolidar las pruebas correspondientes. |
+| CA-02 | RF-06: Creación de solicitudes. RF-07: Consulta de solicitudes. RF-08: Adjuntos en solicitudes. | Pendiente de completar con los módulos del solicitante. | Pendiente | Pendiente |
+| CA-03 | RF-09: Evaluación. RF-10: Clasificación y prioridad. RF-11: Asignación de técnicos. RF-12: Reasignación. RF-13: Consulta de solicitudes asignadas. RF-14: Actualización del estado. | RF-13 y RF-14: `apps/backend/app/api/solicitudes.py` y `apps/backend/app/services/solicitudes.py`. Esquema de RF-14: `apps/backend/app/schemas/solicitud.py`. Modelo de historial: `apps/backend/app/models/historial_cambio.py`. | Pendiente | `apps/backend/tests/test_rf14_actualizar_estado.py`: 9 pruebas específicas de RF-14. Suite general: 56 pruebas aprobadas. |
+| CA-04 | RF-16: Registro de intervenciones. RF-17: Visibilidad de intervenciones. RF-18: Solicitud de información adicional. RF-19: Registro de solución. RF-21: Consulta de intervenciones. RF-22: Conversación asociada a solicitudes. RF-23: Envío y consulta de mensajes. RF-26: Consulta de historial de mensajes. RF-28: Historial de cambios. | Pendiente de completar con los módulos de atención técnica y comunicación. RF-14 ya registra cambios de estado en `historial_cambios`, pero esto no representa la implementación completa de RF-28. | Pendiente | Pendiente de consolidar las pruebas correspondientes. |
+| CA-05 | RF-15: Cancelación de solicitudes. RF-20: Revisión y cierre de solicitudes. RF-24: Adjuntos en mensajes. RF-25: Adjuntos en intervenciones. | Pendiente de completar con los módulos correspondientes. | Pendiente | Pendiente |
+| CA-06 | RF-27: Notificaciones en la plataforma. RF-29: Consulta de estadísticas. | Pendiente de completar con el módulo del coordinador. | Pendiente | Pendiente |
+
+## 2. Sustentación del proyecto
+
+Durante la sustentación, el equipo deberá:
+
+1. Demostrar un caso completo del proceso de atención de una solicitud.
+2. Explicar las principales decisiones de diseño y arquitectura.
+3. Ejecutar nuevamente pruebas funcionales seleccionadas y mostrar sus resultados.
+4. Mostrar el historial de commits, ramas y Pull Requests para evidenciar las contribuciones de cada integrante.
+5. Explicar individualmente las funcionalidades desarrolladas por cada integrante.
+
+## 3. Actualización de la matriz
+
+La matriz deberá mantenerse actualizada a medida que se implementen, prueben e integren los requisitos.
+
+Para registrar una implementación se deberá indicar la ruta concreta del código o componente. En la columna de Pull Request se incluirá el número o enlace correspondiente cuando exista. En la columna de pruebas se identificarán los archivos de pruebas y los resultados obtenidos.
+
+Las funcionalidades pendientes de implementación, integración o validación deberán conservar ese estado hasta contar con evidencia suficiente.

@@ -1,7 +1,6 @@
 import uuid
 from datetime import datetime
 from typing import Literal
-
 from pydantic import BaseModel
 
 from app.schemas.pagination import Pagination
@@ -48,3 +47,6 @@ class SolicitudResumen(BaseModel):
 class SolicitudesPagina(BaseModel):
     data: list[SolicitudResumen]
     pagination: Pagination
+
+class ActualizarEstadoSolicitud(BaseModel):
+    estado: Literal["en_atencion", "en_espera"]
