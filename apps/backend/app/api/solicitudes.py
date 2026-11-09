@@ -7,6 +7,12 @@ from sqlalchemy.orm import Session
 
 
 
+from app.schemas.solicitud_informacion import (
+    CrearSolicitudInformacion,
+    SolicitudInformacionRespuesta,
+)
+from app.services.solicitudes_informacion import crear_solicitud_informacion
+
 from app.schemas.intervencion import CrearIntervencion, IntervencionRespuesta,IntervencionesRespuesta
 from app.services.intervenciones import registrar_intervencion,consultar_intervenciones
 
@@ -155,3 +161,35 @@ def obtener_intervenciones(
     )
 
     return {"data": intervenciones}
+
+
+@router.post(
+    "/requests/{solicitud_id}/information-requests",
+    status_code=201,
+)
+def crear_peticion_informacion(
+    solicitud_id: uuid.UUID,
+    datos: CrearSolicitudInformacion,
+    db: Session = Depends(get_db),
+    usuario: UsuarioActual = Depends(get_current_user),
+):
+    """RF-18: permite al técnico asignado solicitar información adicional."""
+
+    if usuario.rol != "tecnico":
+        raise ApiError(
+            403,
+            "SIN_PERMISO",
+            "Solo los técnicos pueden solicitar información adicional desde este módulo.",
+        )
+
+    peticion = crear_solicitud_informacion(
+        db=db,
+        solicitud_id=solicitud_id,
+        tecnico_id=usuario.id,
+        datos=datos,
+    )
+
+    return {
+        "mensaje": "Solicitud de información registrada correctamente",
+        "solicitud_informacion": SolicitudInformacionRespuesta.model_validate(peticion),
+    }
