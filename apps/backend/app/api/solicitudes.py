@@ -2,8 +2,10 @@
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.orm import Session
+
+from app.services.adjuntos import registrar_adjunto, ErrorStorage
 
 from app.schemas.solucion import RegistrarSolucion
 
@@ -229,5 +231,53 @@ def resolver_solicitud(
             "resuelto_por": solicitud.resuelto_por,
             "fecha_resolucion": solicitud.fecha_resolucion,
             "fecha_actualizacion": solicitud.fecha_actualizacion,
+        },
+    }
+
+
+@router.post(
+    "/requests/{solicitud_id}/interventions/{intervencion_id}/attachments",
+    status_code=201,
+)
+def adjuntar_imagen_intervencion(
+    solicitud_id: uuid.UUID,
+    intervencion_id: uuid.UUID,
+    archivo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    usuario: UsuarioActual = Depends(get_current_user),
+):
+    """RF-25: adjunta una imagen WebP a una intervención técnica."""
+
+    if usuario.rol != "tecnico":
+        raise ApiError(
+            403,
+            "SIN_PERMISO",
+            "Solo los técnicos pueden adjuntar imágenes.",
+        )
+
+    try:
+        adjunto = registrar_adjunto(
+            db=db,
+            solicitud_id=solicitud_id,
+            intervencion_id=intervencion_id,
+            tecnico_id=usuario.id,
+            archivo=archivo,
+        )
+    except ErrorStorage as error:
+        raise ApiError(
+            502,
+            "ERROR_ALMACENAMIENTO",
+            "No fue posible almacenar la imagen.",
+        ) from error
+
+    return {
+        "mensaje": "Imagen adjuntada correctamente.",
+        "adjunto": {
+            "id": adjunto.id,
+            "solicitud_id": adjunto.solicitud_id,
+            "nombre_archivo": adjunto.nombre_archivo,
+            "tipo_archivo": adjunto.tipo_archivo,
+            "tamano": adjunto.tamano,
+            "fecha_subida": adjunto.fecha_subida,
         },
     }
