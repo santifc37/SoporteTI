@@ -655,64 +655,98 @@ El sistema no enviará correos electrónicos ni mensajes de texto. Toda la comun
 
 ## 12. Criterios de aceptación del proyecto
 
-Los siguientes criterios agrupan los flujos principales que deberán demostrarse para considerar funcional la primera versión.
+Los criterios de aceptación del proyecto corresponden a las seis condiciones obligatorias establecidas en `proyecto2.md`. Estas condiciones delimitan los resultados que deben demostrarse mediante la aplicación funcional y las pruebas documentadas.
 
-### CA-01. Autenticación y permisos
+### CA-01. Registro de casos de soporte
 
-Un usuario registrado puede iniciar sesión y acceder únicamente a las funcionalidades y datos correspondientes a su rol. El coordinador puede crear cuentas y administrar usuarios.
+Un usuario solicitante puede reportar un incidente o solicitar soporte tecnológico mediante la plataforma. El sistema registra el caso de forma persistente y permite recuperarlo posteriormente.
 
-### CA-02. Registro y consulta de solicitudes
+**Requisitos relacionados:** RF-06.
 
-Un solicitante puede registrar una solicitud con la información requerida, incluyendo tipo, descripción, ubicación, datos de contacto y placa del equipo cuando corresponda. Puede consultar sus propias solicitudes y su estado.
+### CA-02. Evaluación y gestión de casos
 
-### CA-03. Evaluación, clasificación y asignación
+El personal autorizado puede evaluar y gestionar un caso de soporte mediante las actuaciones permitidas para su rol. Las acciones de gestión deben quedar asociadas al caso y al responsable correspondiente.
 
-El coordinador puede evaluar solicitudes, establecer categoría y prioridad, asignar un técnico y reasignarlo cuando sea necesario. El técnico puede consultar únicamente los casos que tiene asignados.
+**Requisitos relacionados:** RF-09, RF-10, RF-11, RF-12 y RF-14.
 
-### CA-04. Atención técnica y seguimiento
+### CA-03. Consulta del estado y responsable
 
-El técnico asignado puede registrar intervenciones, solicitar información adicional, consultar las respuestas del solicitante y documentar una solución. El sistema conserva los cambios y el historial de atención.
+El sistema permite identificar quién es responsable de un caso y consultar su estado durante el proceso de atención. La información presentada debe corresponder con las asignaciones y actuaciones registradas.
 
-### CA-05. Resolución y cierre
+**Requisitos relacionados:** RF-07, RF-11, RF-12, RF-13 y RF-14.
 
-El coordinador puede revisar una solicitud resuelta y cerrarla por solución. También puede realizar cierres administrativos justificados. El solicitante puede cancelar en los estados permitidos. Una solicitud cerrada no admite nuevas operaciones, pero conserva su información para consulta autorizada.
+### CA-04. Historial de intervenciones
 
-### CA-06. Consolidado del coordinador
+El sistema conserva las intervenciones realizadas durante la atención de un caso y permite consultarlas en la secuencia correspondiente, respetando los permisos y las reglas de visibilidad.
 
-El coordinador puede consultar las solicitudes y obtener un consolidado básico de su estado, prioridad, categoría y tiempos de atención cuando existan datos suficientes.
+**Requisitos relacionados:** RF-16, RF-17, RF-21 y RF-28.
 
-## 13. Pruebas funcionales previstas
+### CA-05. Consulta del resultado y finalización
 
-Las siguientes pruebas servirán como base para documentar las 12 pruebas funcionales exigidas en la evaluación. Sus resultados, evidencias y observaciones se registrarán en `docs/pruebas.md`.
+El solicitante puede consultar el resultado de la atención y la finalización de su caso. El resultado de un caso cerrado debe permanecer disponible para consulta autorizada.
+
+**Requisitos relacionados:** RF-07, RF-19 y RF-20.
+
+### CA-06. Consulta consolidada de coordinación
+
+El coordinador puede consultar información consolidada de varios casos de soporte, incluyendo su estado y sus responsables, de acuerdo con el alcance aprobado.
+
+**Requisitos relacionados:** RF-29.
+
+## 13. Plan de pruebas funcionales
+
+De acuerdo con la Actividad 6 de `proyecto2.md`, el proyecto debe contar con doce pruebas funcionales que permitan verificar el comportamiento de los servicios web, las reglas de negocio y la integración entre la interfaz, la API REST y la base de datos.
+
+Las siguientes pruebas definen los escenarios que deberán ejecutarse y documentarse. Esta sección representa el plan de pruebas; no implica que las pruebas ya hayan sido ejecutadas ni aprobadas.
 
 | ID | Prueba | Resultado esperado | Criterio relacionado |
 |---|---|---|---|
-| PF-01 | Inicio de sesión con credenciales válidas e inválidas. | Permite el acceso con credenciales válidas y rechaza las incorrectas. | CA-01 |
-| PF-02 | Acceso a funcionalidades según el rol. | Cada usuario accede únicamente a las operaciones permitidas. | CA-01 |
-| PF-03 | Creación de usuarios por el coordinador. | El coordinador crea cuentas con el rol correspondiente. | CA-01 |
-| PF-04 | Registro de una solicitud por un solicitante. | La solicitud se crea con los datos obligatorios y estado `Registrado`. | CA-02 |
-| PF-05 | Consulta de solicitudes según el rol. | El solicitante ve las propias, el técnico las asignadas y el coordinador todas. | CA-02 |
-| PF-06 | Evaluación, clasificación y prioridad. | El coordinador puede evaluar y clasificar una solicitud. | CA-03 |
-| PF-07 | Asignación y reasignación de técnicos. | Se actualiza el responsable y se conserva el historial de asignaciones. | CA-03 |
-| PF-08 | Registro de intervención técnica. | El técnico asignado registra una intervención y se respeta su visibilidad. | CA-04 |
-| PF-09 | Solicitud y respuesta de información adicional. | El técnico o coordinador solicita información y el solicitante puede responder. | CA-04 |
-| PF-10 | Registro de solución y cierre. | El técnico registra la solución y el coordinador puede cerrar la solicitud. | CA-05 |
-| PF-11 | Cancelación y cierre administrativo. | Se permiten los cierres según el rol, estado y motivo correspondiente. | CA-05 |
-| PF-12 | Consulta del consolidado del coordinador. | Se muestran cantidades y datos agrupados según la información registrada. | CA-06 |
+| PF-01 | Registro válido de un caso de soporte. | El caso se registra correctamente, queda persistido y puede recuperarse. | CA-01 |
+| PF-02 | Registro de un caso con datos inválidos. | El sistema rechaza los datos inválidos y no guarda un caso incorrecto. | CA-01 |
+| PF-03 | Consulta de un caso existente. | El sistema devuelve la información correcta del caso solicitado. | CA-01, CA-03 |
+| PF-04 | Consulta de un caso inexistente. | El sistema devuelve una respuesta de error controlada y no presenta información inexistente. | CA-03 |
+| PF-05 | Gestión de un caso por personal autorizado. | El sistema permite la actuación autorizada y la registra asociada al caso y al responsable. | CA-02 |
+| PF-06 | Intento de gestión por un actor no autorizado. | El sistema impide la operación y protege la información del caso. | CA-02 |
+| PF-07 | Consulta del estado y responsable de un caso. | El sistema presenta el estado y el responsable que corresponden con los registros existentes. | CA-03 |
+| PF-08 | Consulta del historial de intervenciones. | El sistema presenta las intervenciones relacionadas con el caso y respeta las reglas de acceso. | CA-04 |
+| PF-09 | Cierre de un caso y consulta del resultado. | El caso queda cerrado y el resultado de la atención puede recuperarse posteriormente. | CA-05 |
+| PF-10 | Consulta consolidada de coordinación. | El coordinador puede consultar información de varios casos, sus estados y responsables. | CA-06 |
+| PF-11 | Verificación de persistencia e integridad de relaciones. | Los casos, actores e intervenciones conservan relaciones consistentes en la base de datos. | CA-01, CA-02, CA-04 |
+| PF-12 | Verificación de integración entre interfaz, API y base de datos. | Se demuestra un flujo de soporte desde la interfaz hasta la persistencia y posterior consulta de la información. | CA-01 a CA-06 |
+
+La ejecución de cada prueba deberá documentarse con los siguientes datos:
+
+- Identificador de la prueba.
+- Requisito asociado.
+- Condiciones iniciales o precondiciones.
+- Pasos de ejecución.
+- Datos de entrada.
+- Resultado esperado.
+- Resultado obtenido.
+- Estado de la prueba: aprobada o fallida.
+- Evidencia correspondiente.
+- Método HTTP y código de respuesta, cuando aplique.
+
+Las evidencias podrán incluir capturas de solicitudes y respuestas HTTP, registros relevantes o capturas de la interfaz. Deben permitir reproducir la verificación.
+
+Los resultados de las pruebas se documentarán posteriormente en `docs/pruebas.md` y las evidencias se conservarán en la carpeta `evidencias/`.
+
+No se exige implementar pruebas automatizadas ni utilizar Postman CLI, Newman, pytest, Jest, Vitest o GitHub Actions para cumplir esta actividad.
 
 ## 14. Trazabilidad de requisitos y criterios de aceptación
 
-La siguiente matriz relaciona los requisitos funcionales con los criterios principales que serán evaluados.
+La siguiente relación identifica los requisitos funcionales asociados a cada una de las seis condiciones obligatorias del proyecto.
 
 | Requisitos funcionales | Criterio de aceptación |
 |---|---|
-| RF-01, RF-02, RF-03, RF-04, RF-05 | CA-01 |
-| RF-06, RF-07, RF-08 | CA-02 |
-| RF-09, RF-10, RF-11, RF-12, RF-13, RF-14 | CA-03 |
-| RF-16, RF-17, RF-18, RF-19, RF-21, RF-22, RF-23, RF-26, RF-28 | CA-04 |
-| RF-15, RF-20, RF-24, RF-25 | CA-05 |
-| RF-27, RF-29 | CA-06 |
+| RF-06 | CA-01 |
+| RF-09, RF-10, RF-11, RF-12, RF-14 | CA-02 |
+| RF-07, RF-11, RF-12, RF-13, RF-14 | CA-03 |
+| RF-16, RF-17, RF-21, RF-28 | CA-04 |
+| RF-07, RF-19, RF-20 | CA-05 |
+| RF-29 | CA-06 |
 
+La trazabilidad entre los criterios de aceptación, los requisitos aprobados, las rutas o componentes implementados, los pull requests y las pruebas ejecutadas se desarrollará en el documento independiente `docs/trazabilidad.md`, de acuerdo con la Actividad 7 de `proyecto2.md`.
 ## 15. Resultado esperado
 
 Al finalizar el desarrollo se espera contar con una plataforma web funcional que permita gestionar el ciclo de atención de solicitudes de soporte técnico.
