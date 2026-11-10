@@ -1,6 +1,6 @@
 # Documento de requisitos — SoporteTI
 
-**Versión:** 1.5  
+**Versión:** 1.6  
 **Estado:** Requisitos revisados para iniciar el desarrollo  
 **Proyecto:** SoporteTI  
 **Asignatura:** Aplicaciones y Servicios Web  
@@ -50,7 +50,6 @@ La primera versión no incluirá:
 - Gestión de inventario de equipos o repuestos.
 - Diagnósticos automáticos mediante inteligencia artificial.
 - Reapertura de solicitudes cerradas.
-- Conversión y optimización avanzada de imágenes antes de almacenarlas.
 - Recuperación automática de contraseña mediante correo electrónico, mensajes de texto u otro servicio de verificación externo.
 
 Estas funcionalidades podrán evaluarse como mejoras posteriores, siempre que no afecten el cumplimiento de los criterios de aceptación principales.
@@ -364,11 +363,24 @@ Se permitirán archivos PNG y JPG/JPEG, con un tamaño máximo de 5 MB por archi
 **RF-25. Adjuntos en intervenciones**  
 **Prioridad:** B
 
-El sistema debe permitir adjuntar imágenes a las intervenciones técnicas.
+El sistema debe permitir que el técnico asignado adjunte imágenes a las intervenciones técnicas de una solicitud que se encuentre abierta.
 
-Se permitirán archivos PNG y JPG/JPEG, con un tamaño máximo de 5 MB por archivo.
+Se admitirán imágenes reconocidas por Pillow, incluyendo los formatos HEIC/HEIF mediante la extensión pillow-heif. El tamaño máximo del archivo original será de 10 MB.
 
-**Criterio de aceptación:** Dada una intervención de una solicitud asignada, cuando el técnico adjunte una imagen válida, el sistema deberá almacenarla y asociarla a la intervención correspondiente.
+Antes de almacenar la imagen, el sistema deberá:
+
+- Validar que el archivo no esté vacío y que su contenido corresponda a una imagen válida.
+- Corregir la orientación cuando contenga información EXIF.
+- Redimensionar las imágenes que superen las dimensiones máximas de 1920 × 1920 píxeles, conservando su proporción.
+- Convertir las imágenes al formato WebP con una calidad del 80 %.
+- Almacenar el archivo convertido en un espacio privado de Supabase Storage.
+- Registrar sus metadatos y asociarlo con la solicitud, la intervención y el técnico que realizó la carga.
+
+Solo el técnico que tenga una asignación activa podrá adjuntar imágenes a sus intervenciones. No se permitirá realizar esta operación sobre solicitudes cerradas.
+
+Si ocurre un error al registrar los metadatos en la base de datos después de almacenar la imagen, el sistema intentará eliminar el archivo almacenado para evitar archivos huérfanos.
+
+**Criterio de aceptación:** Dada una intervención perteneciente a una solicitud abierta y asignada al técnico autenticado, cuando este adjunte una imagen válida de hasta 10 MB, el sistema deberá validarla, convertirla a WebP y almacenarla en Supabase Storage, conservando su asociación con la intervención y la solicitud. Los archivos inválidos, superiores al límite establecido o enviados por usuarios sin autorización deberán ser rechazados.
 
 **RF-26. Historial de conversación**  
 **Prioridad:** M
@@ -458,7 +470,7 @@ El sistema debe permitir al coordinador consultar estadísticas básicas sobre l
 
 **RN-27.** Los técnicos que no estén asignados a una solicitud no podrán consultar sus mensajes ni sus intervenciones internas.
 
-**RN-28.** Los archivos adjuntos deberán ser imágenes en formato PNG o JPG/JPEG y no podrán superar los 5 MB por archivo.
+**RN-28.** Los adjuntos de solicitudes y mensajes deberán ser imágenes en formato PNG o JPG/JPEG y no podrán superar los 5 MB por archivo. Los adjuntos de intervenciones técnicas se regirán por las condiciones específicas establecidas en RF-25.
 
 **RN-29.** El sistema no enviará mensajes por correo electrónico, mensajes de texto ni otros servicios externos. Las comunicaciones y los avisos se realizarán dentro de la plataforma.
 
@@ -633,7 +645,7 @@ El sistema no enviará correos electrónicos ni mensajes de texto. Toda la comun
 
 **S-09.** Los usuarios utilizarán la plataforma para enviar y consultar los mensajes relacionados con sus solicitudes.
 
-**S-10.** Los archivos adjuntos serán imágenes PNG o JPG/JPEG que no superen los 5 MB por archivo.
+**S-10.** Los adjuntos de solicitudes y mensajes serán imágenes PNG o JPG/JPEG que no superen los 5 MB por archivo. Los adjuntos de intervenciones técnicas seguirán las condiciones establecidas en RF-25.
 
 **S-11.** La placa o identificador del equipo podrá no existir para solicitudes que no estén relacionadas con un equipo identificable.
 
@@ -679,7 +691,7 @@ El sistema permite identificar quién es responsable de un caso y consultar su e
 
 El sistema conserva las intervenciones realizadas durante la atención de un caso y permite consultarlas en la secuencia correspondiente, respetando los permisos y las reglas de visibilidad.
 
-**Requisitos relacionados:** RF-16, RF-17, RF-21 y RF-28.
+**Requisitos relacionados:** RF-16, RF-17 y RF-21.
 
 ### CA-05. Consulta del resultado y finalización
 
@@ -742,11 +754,12 @@ La siguiente relación identifica los requisitos funcionales asociados a cada un
 | RF-06 | CA-01 |
 | RF-09, RF-10, RF-11, RF-12, RF-14 | CA-02 |
 | RF-07, RF-11, RF-12, RF-13, RF-14 | CA-03 |
-| RF-16, RF-17, RF-21, RF-28 | CA-04 |
+| RF-16, RF-17, RF-21 | CA-04 |
 | RF-07, RF-19, RF-20 | CA-05 |
 | RF-29 | CA-06 |
 
 La trazabilidad entre los criterios de aceptación, los requisitos aprobados, las rutas o componentes implementados, los pull requests y las pruebas ejecutadas se desarrollará en el documento independiente `docs/trazabilidad.md`, de acuerdo con la Actividad 7 de `proyecto2.md`.
+
 ## 15. Resultado esperado
 
 Al finalizar el desarrollo se espera contar con una plataforma web funcional que permita gestionar el ciclo de atención de solicitudes de soporte técnico.
