@@ -13,19 +13,23 @@ export function LoginPage() {
   const [enviando, setEnviando] = useState(false)
 
   if (cargando) {
-    return <p className="p-6 text-center text-texto">Verificando sesión...</p>
+    return (
+      <p className="p-6 text-center text-texto">
+        Verificando sesión...
+      </p>
+    )
   }
 
-if (usuario) {
-  const ruta =
-    usuario.rol === 'tecnico'
-      ? '/tecnico'
-      : usuario.rol === 'solicitante'
-        ? '/solicitante'
-        : '/coordinador'
+  if (usuario) {
+    const ruta =
+      usuario.rol === 'tecnico'
+        ? '/tecnico'
+        : usuario.rol === 'solicitante'
+          ? '/solicitante'
+          : '/coordinador'
 
-  return <Navigate to={ruta} replace />
-}
+    return <Navigate to={ruta} replace />
+  }
 
   async function manejarEnvio(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault()
@@ -33,18 +37,19 @@ if (usuario) {
     setEnviando(true)
 
     try {
-      await login({ correo, contrasena })
-      const respuesta = await import('../services/auth')
-      const sesion = await respuesta.obtenerUsuario()
+      const usuarioAutenticado = await login({
+        correo,
+        contrasena,
+      })
 
-const ruta =
-  sesion.usuario.rol === 'tecnico'
-    ? '/tecnico'
-    : sesion.usuario.rol === 'solicitante'
-      ? '/solicitante'
-      : '/coordinador'
+      const ruta =
+        usuarioAutenticado.rol === 'tecnico'
+          ? '/tecnico'
+          : usuarioAutenticado.rol === 'solicitante'
+            ? '/solicitante'
+            : '/coordinador'
 
-navigate(ruta, { replace: true })
+      navigate(ruta, { replace: true })
     } catch (error) {
       setError(
         error instanceof Error
@@ -60,7 +65,10 @@ navigate(ruta, { replace: true })
     <main className="flex min-h-screen items-center justify-center bg-fondo px-4 py-8">
       <section className="w-full max-w-md rounded-2xl border border-panel bg-tarjeta p-8 shadow-xl">
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-primario">SoporteTI</h1>
+          <h1 className="text-3xl font-bold text-primario">
+            SoporteTI
+          </h1>
+
           <p className="mt-2 text-sm text-texto-secundario">
             Sistema de gestión de solicitudes de soporte
           </p>
@@ -68,9 +76,13 @@ navigate(ruta, { replace: true })
 
         <form onSubmit={manejarEnvio} className="space-y-5">
           <div>
-            <label htmlFor="correo" className="mb-2 block text-sm font-semibold text-texto">
+            <label
+              htmlFor="correo"
+              className="mb-2 block text-sm font-semibold text-texto"
+            >
               Correo electrónico
             </label>
+
             <input
               id="correo"
               type="email"
@@ -84,9 +96,13 @@ navigate(ruta, { replace: true })
           </div>
 
           <div>
-            <label htmlFor="contrasena" className="mb-2 block text-sm font-semibold text-texto">
+            <label
+              htmlFor="contrasena"
+              className="mb-2 block text-sm font-semibold text-texto"
+            >
               Contraseña
             </label>
+
             <input
               id="contrasena"
               type="password"

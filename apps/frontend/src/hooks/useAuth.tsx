@@ -1,3 +1,4 @@
+
 import {
   createContext,
   useCallback,
@@ -21,7 +22,7 @@ import type {
 interface AuthContextType {
   usuario: Usuario | null
   cargando: boolean
-  login: (datos: LoginRequest) => Promise<void>
+  login: (datos: LoginRequest) => Promise<Usuario>
   logout: () => Promise<void>
 }
 
@@ -50,9 +51,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     void verificarSesion()
   }, [])
 
-  const login = useCallback(async (datos: LoginRequest) => {
+  const login = useCallback(async (datos: LoginRequest): Promise<Usuario> => {
     const respuesta = await iniciarSesion(datos)
     setUsuario(respuesta.usuario)
+    return respuesta.usuario
   }, [])
 
   const logout = useCallback(async () => {

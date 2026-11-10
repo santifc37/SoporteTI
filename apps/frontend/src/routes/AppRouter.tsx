@@ -29,20 +29,40 @@ function InicioSegunRol() {
 }
 
 
+
 function ModuloPendiente() {
   const { usuario } = useAuth()
 
-  const esTecnico = usuario?.rol === 'tecnico'
+  const rol = usuario?.rol
 
-  const rutaInicio = esTecnico ? '/tecnico' : '/solicitante'
+  const configuracion = {
+    tecnico: {
+      titulo: 'Panel del técnico',
+      ruta: '/tecnico',
+    },
+    solicitante: {
+      titulo: 'Panel del solicitante',
+      ruta: '/solicitante',
+    },
+    coordinador: {
+      titulo: 'Panel del coordinador',
+      ruta: '/coordinador',
+    },
+  }
+
+  if (!rol) {
+    return null
+  }
+
+  const panel = configuracion[rol]
 
   return (
     <PanelLayout
-      titulo={esTecnico ? 'Panel del técnico' : 'Panel del solicitante'}
+      titulo={panel.titulo}
       navegacion={[
         {
           nombre: 'Inicio',
-          ruta: rutaInicio,
+          ruta: panel.ruta,
         },
       ]}
     >
@@ -57,6 +77,7 @@ function ModuloPendiente() {
     </PanelLayout>
   )
 }
+
 
 
 function RutasAplicacion() {
