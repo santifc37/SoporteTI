@@ -26,11 +26,13 @@ from app.schemas.solicitud import (
     EstadoSolicitud,
     PrioridadSolicitud,
     SolicitudesPagina,
+    TipoCierre,
     TipoSolicitud,
 )
 from app.services.solicitudes import (
     FiltrosSolicitudes,
     actualizar_estado_solicitud,
+    listar_solicitudes,
     listar_solicitudes_asignadas,
     registrar_solucion,
 )
@@ -47,12 +49,22 @@ def consultar_solicitudes(
     busqueda: str | None = Query(default=None, max_length=100),
     fecha_desde: datetime | None = None,
     fecha_hasta: datetime | None = None,
+    solicitante_id: uuid.UUID | None = None,
+    tecnico_id: uuid.UUID | None = None,
+    tipo_cierre: TipoCierre | None = None,
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),
     usuario: UsuarioActual = Depends(get_current_user),
 ):
-    """Consulta las solicitudes a las que tiene acceso el usuario (RF-07, RF-13)."""
+    """Consulta las solicitudes a las que tiene acceso el usuario (RF-07, RF-13).
+
+    - Técnico: solo las que tiene asignadas actualmente.
+    - Solicitante: solo las propias.
+    - Coordinador: todas; además puede filtrar por solicitante, técnico y tipo de cierre.
+
+    Los filtros nunca amplían los permisos (contrato-api.md §17).
+    """
 
     if fecha_desde and fecha_hasta and fecha_desde > fecha_hasta:
         raise ApiError(
@@ -67,24 +79,40 @@ def consultar_solicitudes(
             ],
         )
 
+    filtros = FiltrosSolicitudes(
+        estado=estado,
+        prioridad=prioridad,
+        categoria_id=categoria_id,
+        tipo=tipo,
+        busqueda=busqueda,
+        fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta,
+    )
+
     if usuario.rol == "tecnico":
-        filtros = FiltrosSolicitudes(
-            estado=estado,
-            prioridad=prioridad,
-            categoria_id=categoria_id,
-            tipo=tipo,
-            busqueda=busqueda,
-            fecha_desde=fecha_desde,
-            fecha_hasta=fecha_hasta,
-        )
         return listar_solicitudes_asignadas(
             db, usuario.id, filtros, page, limit
         )
 
+    if usuario.rol == "solicitante":
+        # Aunque envíe solicitante_id, solo ve las suyas.
+        return listar_solicitudes(
+            db, filtros, page, limit, solicitante_id=usuario.id
+        )
+
+    if usuario.rol == "coordinador":
+        return listar_solicitudes(
+            db,
+            filtros,
+            page,
+            limit,
+            solicitante_id=solicitante_id,
+            tecnico_id=tecnico_id,
+            tipo_cierre=tipo_cierre,
+        )
+
     raise ApiError(
-        501,
-        "NO_IMPLEMENTADO",
-        "La consulta de solicitudes para este rol aún no está disponible.",
+        403, "PERMISO_DENEGADO", "No tienes permisos para realizar esta operación."
     )
 
 
@@ -311,4 +339,27 @@ def registrar_solicitud(
     return SolicitudCreadaMensaje(
         mensaje="Solicitud creada correctamente",
         solicitud=SolicitudCreada.model_validate(solicitud),
+    )
+
+
+# --------------------------- RF-07: detalle de una solicitud ---------------------------
+
+from app.schemas.solicitud import SolicitudDetalle
+from app.services.solicitudes import obtener_solicitud_detalle
+
+
+@router.get("/requests/{solicitud_id}", response_model=SolicitudDetalle)
+def detalle_solicitud(
+    solicitud_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    usuario: UsuarioActual = Depends(get_current_user),
+):
+    """RF-07: detalle de una solicitud (contrato-api.md §7.3).
+
+    Pueden consultarla el solicitante propietario, el técnico asignado
+    actualmente y el coordinador.
+    """
+
+    return obtener_solicitud_detalle(
+        db=db, solicitud_id=solicitud_id, usuario_id=usuario.id, rol=usuario.rol
     )

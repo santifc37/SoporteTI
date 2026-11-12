@@ -35,10 +35,16 @@ class FiltrosSolicitudes:
 
 def _condiciones(tecnico_id: uuid.UUID, filtros: FiltrosSolicitudes) -> list:
     """Condiciones de consulta: asignación activa del técnico y filtros."""
-    condiciones = [
+    return [
         Asignacion.tecnico_id == tecnico_id,
         Asignacion.fecha_finalizacion.is_(None),
+        *_condiciones_de_filtros(filtros),
     ]
+
+
+def _condiciones_de_filtros(filtros: FiltrosSolicitudes) -> list:
+    """Condiciones de los filtros comunes a todos los roles (RF-07, RF-13)."""
+    condiciones = []
 
     if filtros.estado:
         condiciones.append(Solicitud.estado == filtros.estado)
@@ -352,3 +358,173 @@ def crear_solicitud(
 
     db.refresh(solicitud)
     return solicitud
+
+
+
+# --------------------------- RF-07: consulta de solicitudes ---------------------------
+
+from sqlalchemy import and_
+
+from app.schemas.solicitud import SolicitudDetalle
+
+
+def listar_solicitudes(
+    db: Session,
+    filtros: FiltrosSolicitudes,
+    page: int,
+    limit: int,
+    *,
+    solicitante_id: uuid.UUID | None = None,
+    tecnico_id: uuid.UUID | None = None,
+    tipo_cierre: str | None = None,
+) -> SolicitudesPagina:
+    """RF-07: lista solicitudes para el solicitante (propias) y el coordinador (todas).
+
+    El técnico asignado se toma de la asignación activa; las solicitudes sin
+    asignar aparecen con `tecnico_asignado = null`.
+    """
+
+    asignacion_activa = aliased(Asignacion)
+    union_asignacion = and_(
+        asignacion_activa.solicitud_id == Solicitud.id,
+        asignacion_activa.fecha_finalizacion.is_(None),
+    )
+
+    condiciones = _condiciones_de_filtros(filtros)
+    if solicitante_id:
+        condiciones.append(Solicitud.solicitante_id == solicitante_id)
+    if tecnico_id:
+        condiciones.append(asignacion_activa.tecnico_id == tecnico_id)
+    if tipo_cierre:
+        condiciones.append(Solicitud.tipo_cierre == tipo_cierre)
+
+    total = db.scalar(
+        select(func.count(Solicitud.id))
+        .select_from(Solicitud)
+        .outerjoin(asignacion_activa, union_asignacion)
+        .where(*condiciones)
+    )
+
+    solicitante = aliased(Usuario)
+    tecnico = aliased(Usuario)
+
+    filas = db.execute(
+        select(Solicitud, solicitante, Categoria, tecnico)
+        .join(solicitante, solicitante.id == Solicitud.solicitante_id)
+        .outerjoin(Categoria, Categoria.id == Solicitud.categoria_id)
+        .outerjoin(asignacion_activa, union_asignacion)
+        .outerjoin(tecnico, tecnico.id == asignacion_activa.tecnico_id)
+        .where(*condiciones)
+        .order_by(Solicitud.fecha_creacion.desc(), Solicitud.id.desc())
+        .offset((page - 1) * limit)
+        .limit(limit)
+    ).all()
+
+    data = [
+        SolicitudResumen(
+            id=sol.id,
+            numero=sol.numero,
+            titulo=sol.titulo,
+            tipo=sol.tipo,
+            prioridad=sol.prioridad,
+            estado=sol.estado,
+            categoria=(
+                CategoriaResumen(id=cat.id, nombre=cat.nombre) if cat else None
+            ),
+            solicitante=UsuarioResumen(
+                id=sol_user.id,
+                nombre=_nombre_completo(sol_user),
+            ),
+            tecnico_asignado=(
+                UsuarioResumen(id=tec.id, nombre=_nombre_completo(tec)) if tec else None
+            ),
+            fecha_creacion=sol.fecha_creacion,
+        )
+        for sol, sol_user, cat, tec in filas
+    ]
+
+    return SolicitudesPagina(
+        data=data,
+        pagination=Pagination(
+            page=page,
+            limit=limit,
+            total=total,
+            total_pages=calcular_total_paginas(total, limit),
+        ),
+    )
+
+
+def obtener_solicitud_detalle(
+    db: Session,
+    solicitud_id: uuid.UUID,
+    usuario_id: uuid.UUID,
+    rol: str,
+) -> SolicitudDetalle:
+    """RF-07: detalle de una solicitud según los permisos del usuario.
+
+    - Solicitante: solo las propias.
+    - Técnico: solo si la tiene asignada actualmente (RN-05).
+    - Coordinador: cualquiera.
+    """
+
+    solicitud = db.get(Solicitud, solicitud_id)
+    if solicitud is None:
+        raise ApiError(404, "RECURSO_NO_ENCONTRADO", "No se encontró la solicitud.")
+
+    asignacion = db.scalar(
+        select(Asignacion).where(
+            Asignacion.solicitud_id == solicitud.id,
+            Asignacion.fecha_finalizacion.is_(None),
+        )
+    )
+
+    if rol == "solicitante":
+        autorizado = solicitud.solicitante_id == usuario_id
+    elif rol == "tecnico":
+        autorizado = asignacion is not None and asignacion.tecnico_id == usuario_id
+    else:
+        autorizado = rol == "coordinador"
+
+    if not autorizado:
+        raise ApiError(
+            403, "PERMISO_DENEGADO", "No tienes permisos para consultar esta solicitud."
+        )
+
+    solicitante = db.get(Usuario, solicitud.solicitante_id)
+    categoria = db.get(Categoria, solicitud.categoria_id) if solicitud.categoria_id else None
+    tecnico = db.get(Usuario, asignacion.tecnico_id) if asignacion else None
+
+    return SolicitudDetalle(
+        id=solicitud.id,
+        numero=solicitud.numero,
+        titulo=solicitud.titulo,
+        descripcion=solicitud.descripcion,
+        tipo=solicitud.tipo,
+        prioridad=solicitud.prioridad,
+        estado=solicitud.estado,
+        ubicacion=solicitud.ubicacion,
+        placa_equipo=solicitud.placa_equipo,
+        medio_contacto=solicitud.medio_contacto,
+        dato_contacto=solicitud.dato_contacto,
+        solicitante=UsuarioResumen(
+            id=solicitante.id, nombre=_nombre_completo(solicitante)
+        ),
+        categoria=(
+            CategoriaResumen(id=categoria.id, nombre=categoria.nombre)
+            if categoria
+            else None
+        ),
+        tecnico_asignado=(
+            UsuarioResumen(id=tecnico.id, nombre=_nombre_completo(tecnico))
+            if tecnico
+            else None
+        ),
+        solucion_final=solicitud.solucion_final,
+        resuelto_por=solicitud.resuelto_por,
+        fecha_resolucion=solicitud.fecha_resolucion,
+        tipo_cierre=solicitud.tipo_cierre,
+        motivo_cierre=solicitud.motivo_cierre,
+        fecha_creacion=solicitud.fecha_creacion,
+        fecha_actualizacion=solicitud.fecha_actualizacion,
+        fecha_cierre=solicitud.fecha_cierre,
+    )

@@ -17,6 +17,7 @@ EstadoSolicitud = Literal[
 ]
 PrioridadSolicitud = Literal["baja", "media", "alta"]
 TipoSolicitud = Literal["incidente", "requerimiento"]
+TipoCierre = Literal["solucion", "cancelacion", "administrativo"]
 
 
 class CategoriaResumen(BaseModel):
@@ -115,3 +116,34 @@ class SolicitudCreada(BaseModel):
 class SolicitudCreadaMensaje(BaseModel):
     mensaje: str
     solicitud: SolicitudCreada
+
+
+
+# --------------------------- RF-07: detalle de una solicitud ---------------------------
+
+
+class SolicitudDetalle(BaseModel):
+    """Respuesta de GET /api/v1/requests/{id} (docs/contrato-api.md §7.3)."""
+
+    id: uuid.UUID
+    numero: str
+    titulo: str
+    descripcion: str
+    tipo: TipoSolicitud
+    prioridad: PrioridadSolicitud | None
+    estado: EstadoSolicitud
+    ubicacion: str
+    placa_equipo: str | None
+    medio_contacto: str
+    dato_contacto: str
+    solicitante: UsuarioResumen
+    categoria: CategoriaResumen | None
+    tecnico_asignado: UsuarioResumen | None
+    solucion_final: str | None
+    resuelto_por: uuid.UUID | None
+    fecha_resolucion: datetime | None
+    tipo_cierre: TipoCierre | None
+    motivo_cierre: str | None
+    fecha_creacion: datetime
+    fecha_actualizacion: datetime
+    fecha_cierre: datetime | None
