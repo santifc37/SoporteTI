@@ -528,3 +528,165 @@ def obtener_solicitud_detalle(
         fecha_actualizacion=solicitud.fecha_actualizacion,
         fecha_cierre=solicitud.fecha_cierre,
     )
+
+
+
+# ---------------------- RF-09: inicio de la evaluación (coordinador) ----------------------
+
+from app.schemas.solicitud import ClasificarSolicitud
+
+
+def _solicitud_para_modificar(db: Session, solicitud_id: uuid.UUID) -> Solicitud:
+    """Obtiene la solicitud bloqueándola para evitar cambios simultáneos."""
+    solicitud = db.scalar(
+        select(Solicitud).where(Solicitud.id == solicitud_id).with_for_update()
+    )
+    if solicitud is None:
+        raise ApiError(
+            404,
+            "SOLICITUD_NO_ENCONTRADA",
+            "La solicitud indicada no existe.",
+        )
+    return solicitud
+
+
+def iniciar_evaluacion(
+    db: Session,
+    solicitud_id: uuid.UUID,
+    coordinador_id: uuid.UUID,
+    nuevo_estado: str,
+) -> tuple[Solicitud, str]:
+    """RF-09 / RF-14: el coordinador pasa una solicitud de `registrado` a `en_evaluacion`.
+
+    Es la única transición que el coordinador hace por esta ruta; las demás
+    son del técnico asignado (en_atencion, en_espera) o tienen ruta propia
+    (asignación, resolución, cierre y cancelación).
+    """
+
+    if nuevo_estado != "en_evaluacion":
+        raise ApiError(
+            403,
+            "PERMISO_DENEGADO",
+            "Ese cambio de estado le corresponde al técnico asignado.",
+        )
+
+    solicitud = _solicitud_para_modificar(db, solicitud_id)
+
+    if solicitud.estado != "registrado":
+        raise ApiError(
+            409,
+            "ESTADO_NO_PERMITIDO",
+            "Solo se puede iniciar la evaluación de una solicitud registrada.",
+        )
+
+    estado_anterior = solicitud.estado
+
+    try:
+        solicitud.estado = "en_evaluacion"
+        solicitud.fecha_actualizacion = datetime.now(timezone.utc)
+        solicitud.version += 1
+
+        db.add(
+            HistorialCambio(
+                solicitud_id=solicitud.id,
+                usuario_id=coordinador_id,
+                tipo_cambio="cambio_estado",
+                valor_anterior=estado_anterior,
+                valor_nuevo="en_evaluacion",
+                observacion="Inicio de evaluación",
+            )
+        )
+        db.commit()
+        db.refresh(solicitud)
+        return solicitud, estado_anterior
+
+    except Exception:
+        db.rollback()
+        raise
+
+
+# ------------------------- RF-10: clasificación y prioridad -------------------------
+
+
+def clasificar_solicitud(
+    db: Session,
+    solicitud_id: uuid.UUID,
+    coordinador_id: uuid.UUID,
+    datos: ClasificarSolicitud,
+) -> Solicitud:
+    """RF-10: el coordinador establece la categoría y la prioridad.
+
+    - No se modifican solicitudes cerradas (RN-22).
+    - La categoría debe existir y estar activa.
+    - Cada cambio real queda en el historial (RN-30); enviar el mismo valor
+      no genera registros.
+    """
+
+    solicitud = _solicitud_para_modificar(db, solicitud_id)
+
+    if solicitud.estado == "cerrado":
+        raise ApiError(
+            409,
+            "SOLICITUD_CERRADA",
+            "No se puede modificar una solicitud cerrada.",
+        )
+
+    cambios = datos.model_dump(exclude_unset=True)
+    registros: list[HistorialCambio] = []
+
+    if "categoria_id" in cambios and cambios["categoria_id"] != solicitud.categoria_id:
+        nueva = None
+        if cambios["categoria_id"] is not None:
+            nueva = db.get(Categoria, cambios["categoria_id"])
+            if nueva is None or not nueva.activa:
+                raise ApiError(
+                    422,
+                    "ERROR_VALIDACION",
+                    "Los datos enviados no son válidos.",
+                    [
+                        {
+                            "campo": "categoria_id",
+                            "mensaje": "La categoría no existe o no está activa.",
+                        }
+                    ],
+                )
+        anterior = (
+            db.get(Categoria, solicitud.categoria_id) if solicitud.categoria_id else None
+        )
+        registros.append(
+            HistorialCambio(
+                solicitud_id=solicitud.id,
+                usuario_id=coordinador_id,
+                tipo_cambio="cambio_categoria",
+                valor_anterior=anterior.nombre if anterior else None,
+                valor_nuevo=nueva.nombre if nueva else None,
+            )
+        )
+        solicitud.categoria_id = cambios["categoria_id"]
+
+    if "prioridad" in cambios and cambios["prioridad"] != solicitud.prioridad:
+        registros.append(
+            HistorialCambio(
+                solicitud_id=solicitud.id,
+                usuario_id=coordinador_id,
+                tipo_cambio="cambio_prioridad",
+                valor_anterior=solicitud.prioridad,
+                valor_nuevo=cambios["prioridad"],
+            )
+        )
+        solicitud.prioridad = cambios["prioridad"]
+
+    if not registros:
+        return solicitud  # nada cambió
+
+    try:
+        solicitud.fecha_actualizacion = datetime.now(timezone.utc)
+        solicitud.version += 1
+        db.add_all(registros)
+        db.commit()
+        db.refresh(solicitud)
+        return solicitud
+
+    except Exception:
+        db.rollback()
+        raise

@@ -123,21 +123,32 @@ def cambiar_estado_solicitud(
     db: Session = Depends(get_db),
     usuario: UsuarioActual = Depends(get_current_user),
 ):
-    """RF-14: permite al técnico asignado actualizar el estado."""
+    """RF-14: cambio de estado según el rol.
 
-    if usuario.rol != "tecnico":
+    - Técnico asignado: asignado → en_atencion, en_atencion ↔ en_espera.
+    - Coordinador (RF-09): registrado → en_evaluacion.
+    """
+
+    if usuario.rol == "coordinador":
+        solicitud, estado_anterior = iniciar_evaluacion(
+            db=db,
+            solicitud_id=solicitud_id,
+            coordinador_id=usuario.id,
+            nuevo_estado=datos.estado,
+        )
+    elif usuario.rol == "tecnico":
+        solicitud, estado_anterior = actualizar_estado_solicitud(
+            db=db,
+            solicitud_id=solicitud_id,
+            tecnico_id=usuario.id,
+            nuevo_estado=datos.estado,
+        )
+    else:
         raise ApiError(
             403,
             "SIN_PERMISO",
             "No tienes permiso para realizar esta operación.",
         )
-
-    solicitud, estado_anterior = actualizar_estado_solicitud(
-        db=db,
-        solicitud_id=solicitud_id,
-        tecnico_id=usuario.id,
-        nuevo_estado=datos.estado,
-    )
 
     return {
         "mensaje": "Estado actualizado correctamente",
@@ -362,4 +373,40 @@ def detalle_solicitud(
 
     return obtener_solicitud_detalle(
         db=db, solicitud_id=solicitud_id, usuario_id=usuario.id, rol=usuario.rol
+    )
+
+
+
+# ------------------- RF-09 / RF-10: evaluación y clasificación -------------------
+
+from app.schemas.solicitud import (
+    ClasificarSolicitud,
+    SolicitudClasificada,
+    SolicitudClasificadaMensaje,
+)
+from app.services.solicitudes import clasificar_solicitud, iniciar_evaluacion
+
+
+@router.patch("/requests/{solicitud_id}", response_model=SolicitudClasificadaMensaje)
+def clasificar(
+    solicitud_id: uuid.UUID,
+    datos: ClasificarSolicitud,
+    db: Session = Depends(get_db),
+    usuario: UsuarioActual = Depends(requiere_rol("coordinador")),
+):
+    """RF-10: el coordinador establece la categoría y la prioridad (contrato §7.4)."""
+
+    solicitud = clasificar_solicitud(
+        db=db, solicitud_id=solicitud_id, coordinador_id=usuario.id, datos=datos
+    )
+
+    return SolicitudClasificadaMensaje(
+        mensaje="Solicitud actualizada correctamente",
+        solicitud=SolicitudClasificada(
+            id=solicitud.id,
+            numero=solicitud.numero,
+            categoria_id=solicitud.categoria_id,
+            prioridad=solicitud.prioridad,
+            estado=solicitud.estado,
+        ),
     )
