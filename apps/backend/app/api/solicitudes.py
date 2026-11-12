@@ -281,3 +281,34 @@ def adjuntar_imagen_intervencion(
             "fecha_subida": adjunto.fecha_subida,
         },
     }
+
+
+# ------------------------------ RF-06: crear solicitud ------------------------------
+
+from app.api.permisos import requiere_rol
+from app.schemas.solicitud import (
+    CrearSolicitud,
+    SolicitudCreada,
+    SolicitudCreadaMensaje,
+)
+from app.services.solicitudes import crear_solicitud
+
+
+@router.post(
+    "/requests",
+    response_model=SolicitudCreadaMensaje,
+    status_code=201,
+)
+def registrar_solicitud(
+    datos: CrearSolicitud,
+    db: Session = Depends(get_db),
+    usuario: UsuarioActual = Depends(requiere_rol("solicitante")),
+):
+    """RF-06: el solicitante registra una solicitud de soporte."""
+
+    solicitud = crear_solicitud(db=db, solicitante_id=usuario.id, datos=datos)
+
+    return SolicitudCreadaMensaje(
+        mensaje="Solicitud creada correctamente",
+        solicitud=SolicitudCreada.model_validate(solicitud),
+    )

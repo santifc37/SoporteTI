@@ -282,3 +282,73 @@ def registrar_solucion(
     except Exception:
         db.rollback()
         raise
+
+
+# ------------------------------ RF-06: crear solicitud ------------------------------
+
+from app.schemas.solicitud import CrearSolicitud
+
+
+def crear_solicitud(
+    db: Session,
+    solicitante_id: uuid.UUID,
+    datos: CrearSolicitud,
+) -> Solicitud:
+    """RF-06: registra una solicitud en estado `registrado`.
+
+    - El solicitante es el usuario de la sesión, nunca un dato del cliente.
+    - La prioridad queda vacía: la asigna el coordinador al evaluarla (RN-10).
+    - La categoría es opcional, pero si se envía debe existir y estar activa.
+    - La solicitud y su registro de creación en el historial se guardan en la
+      misma transacción (contrato-api.md §19, regla 1).
+    - El número legible (ST-000001) lo genera PostgreSQL con una secuencia.
+    """
+
+    if datos.categoria_id is not None:
+        categoria = db.get(Categoria, datos.categoria_id)
+        if categoria is None or not categoria.activa:
+            raise ApiError(
+                422,
+                "ERROR_VALIDACION",
+                "Los datos enviados no son válidos.",
+                [
+                    {
+                        "campo": "categoria_id",
+                        "mensaje": "La categoría no existe o no está activa.",
+                    }
+                ],
+            )
+
+    solicitud = Solicitud(
+        titulo=datos.titulo,
+        descripcion=datos.descripcion,
+        tipo=datos.tipo,
+        categoria_id=datos.categoria_id,
+        ubicacion=datos.ubicacion,
+        placa_equipo=datos.placa_equipo or None,
+        medio_contacto=datos.medio_contacto,
+        dato_contacto=datos.dato_contacto,
+        solicitante_id=solicitante_id,
+        estado="registrado",
+    )
+
+    try:
+        db.add(solicitud)
+        db.flush()  # inserta la solicitud antes que su registro de historial
+
+        db.add(
+            HistorialCambio(
+                solicitud_id=solicitud.id,
+                usuario_id=solicitante_id,
+                tipo_cambio="creacion",
+                valor_nuevo="registrado",
+                observacion="Registro de la solicitud",
+            )
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    db.refresh(solicitud)
+    return solicitud

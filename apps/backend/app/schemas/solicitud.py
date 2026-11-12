@@ -50,3 +50,68 @@ class SolicitudesPagina(BaseModel):
 
 class ActualizarEstadoSolicitud(BaseModel):
     estado: Literal["en_atencion", "en_espera"]
+
+# ------------------------------ RF-06: crear solicitud ------------------------------
+# Esquemas de POST /api/v1/requests (docs/contrato-api.md §7.2).
+
+import re
+from typing import Annotated
+
+from pydantic import ConfigDict, StringConstraints, model_validator
+
+PATRON_CORREO = r"[^@\s]+@[^@\s]+\.[^@\s]+"
+PATRON_TELEFONO = r"\+?[0-9 ()-]{7,20}"
+
+Titulo = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+Descripcion = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=5000)]
+Ubicacion = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+PlacaEquipo = Annotated[str, StringConstraints(strip_whitespace=True, max_length=50)]
+DatoContacto = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
+
+
+class CrearSolicitud(BaseModel):
+    """Datos que envía el solicitante.
+
+    El solicitante, el estado, la prioridad y las fechas los asigna el backend;
+    si se envían (por ejemplo `solicitante_id`), la petición se rechaza con 422.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    titulo: Titulo
+    descripcion: Descripcion
+    tipo: TipoSolicitud
+    categoria_id: uuid.UUID | None = None
+    ubicacion: Ubicacion
+    # Solo cuando la solicitud se refiere a un equipo identificable (RN-36).
+    placa_equipo: PlacaEquipo | None = None
+    medio_contacto: Literal["correo", "telefono"]
+    dato_contacto: DatoContacto
+
+    @model_validator(mode="after")
+    def _dato_de_contacto_coherente(self):
+        if self.medio_contacto == "correo" and not re.fullmatch(PATRON_CORREO, self.dato_contacto):
+            raise ValueError("El dato de contacto debe ser un correo electrónico válido.")
+        if self.medio_contacto == "telefono" and not re.fullmatch(PATRON_TELEFONO, self.dato_contacto):
+            raise ValueError("El dato de contacto debe ser un número de teléfono válido.")
+        return self
+
+
+class SolicitudCreada(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    numero: str
+    titulo: str
+    descripcion: str
+    tipo: TipoSolicitud
+    prioridad: PrioridadSolicitud | None
+    estado: EstadoSolicitud
+    solicitante_id: uuid.UUID
+    categoria_id: uuid.UUID | None
+    fecha_creacion: datetime
+
+
+class SolicitudCreadaMensaje(BaseModel):
+    mensaje: str
+    solicitud: SolicitudCreada
