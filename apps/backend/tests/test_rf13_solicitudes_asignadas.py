@@ -329,10 +329,12 @@ def test_con_login_real_de_punta_a_punta(client, db, escenario):
     assert [s["id"] for s in respuesta.json()["data"]] == [str(propia.id)]
 
 
-def test_roles_sin_implementar_responden_501(client, escenario):
-    """Solicitante (RF-07) y coordinador son del integrante 1: ajustar al integrarlos."""
+def test_solicitante_y_coordinador_ya_tienen_consulta(client, escenario):
+    """Antes respondían 501; RF-07 ya implementa su consulta.
+
+    El detalle de lo que ve cada rol se prueba en test_rf07_consultar_solicitudes.py.
+    """
     for rol in ("solicitante", "coordinador"):
         como(escenario[rol])
         respuesta = client.get(URL)
-        assert respuesta.status_code == 501
-        assert respuesta.json()["error"]["codigo"] == "NO_IMPLEMENTADO"
+        assert respuesta.status_code == 200
