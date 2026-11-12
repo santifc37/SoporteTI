@@ -50,7 +50,8 @@ class SolicitudesPagina(BaseModel):
     pagination: Pagination
 
 class ActualizarEstadoSolicitud(BaseModel):
-    estado: Literal["en_atencion", "en_espera"]
+    # en_evaluacion: coordinador (RF-09). en_atencion / en_espera: técnico asignado (RF-14).
+    estado: Literal["en_evaluacion", "en_atencion", "en_espera"]
 
 # ------------------------------ RF-06: crear solicitud ------------------------------
 # Esquemas de POST /api/v1/requests (docs/contrato-api.md §7.2).
@@ -147,3 +148,42 @@ class SolicitudDetalle(BaseModel):
     fecha_creacion: datetime
     fecha_actualizacion: datetime
     fecha_cierre: datetime | None
+
+
+
+# ------------------------- RF-10: clasificación y prioridad -------------------------
+
+
+class ClasificarSolicitud(BaseModel):
+    """PATCH /api/v1/requests/{id} (docs/contrato-api.md §7.4).
+
+    Solo se pueden enviar la categoría y la prioridad; cualquier otro campo
+    (estado, solicitante, datos de cierre...) se rechaza con 422.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    # null quita la categoría.
+    categoria_id: uuid.UUID | None = None
+    prioridad: PrioridadSolicitud | None = None
+
+    @model_validator(mode="after")
+    def _validar(self):
+        if not self.model_fields_set:
+            raise ValueError("Debes enviar categoria_id, prioridad o ambos.")
+        if "prioridad" in self.model_fields_set and self.prioridad is None:
+            raise ValueError("La prioridad no puede quitarse, solo cambiarse.")
+        return self
+
+
+class SolicitudClasificada(BaseModel):
+    id: uuid.UUID
+    numero: str
+    categoria_id: uuid.UUID | None
+    prioridad: PrioridadSolicitud | None
+    estado: EstadoSolicitud
+
+
+class SolicitudClasificadaMensaje(BaseModel):
+    mensaje: str
+    solicitud: SolicitudClasificada
