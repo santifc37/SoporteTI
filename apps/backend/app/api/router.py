@@ -1,6 +1,7 @@
 
 from fastapi import APIRouter
 
+from app.api.asignaciones import router as asignaciones_router
 from app.api.auth import router as auth_router
 from app.api.categorias import router as categorias_router
 from app.api.health import router as health_router
@@ -15,3 +16,4 @@ api_router.include_router(auth_router)
 api_router.include_router(usuarios_router)
 api_router.include_router(categorias_router)
 api_router.include_router(solicitudes_router)
+api_router.include_router(asignaciones_router)
