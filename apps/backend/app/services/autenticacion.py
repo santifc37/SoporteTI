@@ -1,7 +1,8 @@
+
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.core.config import get_session_duration_hours
@@ -22,24 +23,17 @@ def _ahora() -> datetime:
 
 
 def iniciar_sesion(db: Session, correo: str, contrasena: str) -> tuple[Usuario, str]:
-    """RF-01: valida las credenciales y crea una sesión.
-
-    Devuelve el usuario y el token en claro, que solo se entrega una vez (en
-    la cookie). Por seguridad, un correo inexistente y una contraseña
-    incorrecta producen exactamente el mismo error.
-    """
+    """RF-01: valida las credenciales y crea una sesión."""
     usuario = db.scalar(
         select(Usuario).where(func.lower(Usuario.correo) == correo.strip().lower())
     )
 
-    # Se verifica siempre una contraseña, exista o no el usuario.
     contrasena_valida = verify_password(
         contrasena, usuario.password_hash if usuario else HASH_FICTICIO
     )
     if usuario is None or not contrasena_valida:
         raise ApiError(401, "CREDENCIALES_INVALIDAS", "Correo o contraseña incorrectos.")
 
-    # Solo se informa de la cuenta desactivada a quien conoce la contraseña.
     if not usuario.activo:
         raise ApiError(401, "USUARIO_INACTIVO", "La cuenta está desactivada.")
 
@@ -59,11 +53,7 @@ def iniciar_sesion(db: Session, correo: str, contrasena: str) -> tuple[Usuario, 
 
 
 def obtener_sesion_valida(db: Session, token: str) -> tuple[Sesion, Usuario] | None:
-    """Devuelve (sesión, usuario) si el token corresponde a una sesión vigente.
-
-    Una sesión es vigente si no está revocada ni vencida. Si la cuenta está
-    desactivada se lanza USUARIO_INACTIVO.
-    """
+    """Devuelve la sesión y el usuario si el token corresponde a una sesión vigente."""
     fila = db.execute(
         select(Sesion, Usuario)
         .join(Usuario, Usuario.id == Sesion.usuario_id)
@@ -73,18 +63,82 @@ def obtener_sesion_valida(db: Session, token: str) -> tuple[Sesion, Usuario] | N
             Sesion.fecha_expiracion > _ahora(),
         )
     ).first()
+
     if fila is None:
         return None
 
     sesion, usuario = fila
     if not usuario.activo:
         raise ApiError(401, "USUARIO_INACTIVO", "La cuenta está desactivada.")
+
     return sesion, usuario
 
 
 def cerrar_sesion(db: Session, sesion_id: uuid.UUID) -> None:
-    """Revoca la sesión indicada (no se borra: queda como histórico)."""
+    """Revoca la sesión indicada."""
     sesion = db.get(Sesion, sesion_id)
     if sesion is not None and not sesion.revocada:
         sesion.revocada = True
         db.commit()
+
+
+def cambiar_contrasena(
+    db: Session,
+    usuario_id: uuid.UUID,
+    sesion_id: uuid.UUID,
+    contrasena_actual: str,
+    contrasena_nueva: str,
+) -> None:
+    """RF-04: permite al usuario autenticado cambiar su contraseña."""
+    usuario = db.get(Usuario, usuario_id)
+
+    if usuario is None or not usuario.activo:
+        raise ApiError(404, "RECURSO_NO_ENCONTRADO", "No se encontró el usuario.")
+
+    if not verify_password(contrasena_actual, usuario.password_hash):
+        raise ApiError(
+            401,
+            "CONTRASENA_ACTUAL_INCORRECTA",
+            "La contraseña actual no es correcta.",
+        )
+
+    usuario.password_hash = hash_password(contrasena_nueva)
+
+    # Se conserva la sesión actual y se revocan las demás.
+    db.execute(
+        update(Sesion)
+        .where(
+            Sesion.usuario_id == usuario_id,
+            Sesion.id != sesion_id,
+            Sesion.revocada.is_(False),
+        )
+        .values(revocada=True)
+    )
+
+    db.commit()
+
+
+def restablecer_contrasena(
+    db: Session,
+    usuario_id: uuid.UUID,
+    contrasena_temporal: str,
+) -> None:
+    """RF-04: el coordinador asigna una contraseña temporal a una cuenta."""
+    usuario = db.get(Usuario, usuario_id)
+
+    if usuario is None:
+        raise ApiError(404, "RECURSO_NO_ENCONTRADO", "No se encontró el usuario.")
+
+    usuario.password_hash = hash_password(contrasena_temporal)
+
+    # El restablecimiento invalida todas las sesiones de la cuenta.
+    db.execute(
+        update(Sesion)
+        .where(
+            Sesion.usuario_id == usuario_id,
+            Sesion.revocada.is_(False),
+        )
+        .values(revocada=True)
+    )
+
+    db.commit()

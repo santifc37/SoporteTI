@@ -1,3 +1,4 @@
+
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 
@@ -10,6 +11,7 @@ from app.core.config import (
 )
 from app.database.session import get_db
 from app.schemas.auth import (
+    CambiarContrasenaPeticion,
     LoginPeticion,
     LoginRespuesta,
     MensajeRespuesta,
@@ -17,7 +19,11 @@ from app.schemas.auth import (
     UsuarioActualDetalle,
     UsuarioSesion,
 )
-from app.services.autenticacion import cerrar_sesion, iniciar_sesion
+from app.services.autenticacion import (
+    cambiar_contrasena,
+    cerrar_sesion,
+    iniciar_sesion,
+)
 
 router = APIRouter(prefix="/auth", tags=["Autenticación"])
 
@@ -64,6 +70,23 @@ def logout(
         samesite=get_session_cookie_samesite(),
     )
     return MensajeRespuesta(mensaje="Sesión cerrada correctamente")
+
+
+@router.post("/change-password", response_model=MensajeRespuesta)
+def cambiar_clave(
+    datos: CambiarContrasenaPeticion,
+    usuario: UsuarioActual = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Permite al usuario autenticado cambiar su contraseña (RF-04)."""
+    cambiar_contrasena(
+        db,
+        usuario.id,
+        usuario.sesion_id,
+        datos.contrasena_actual,
+        datos.contrasena_nueva,
+    )
+    return MensajeRespuesta(mensaje="Contraseña actualizada correctamente")
 
 
 @router.get("/me", response_model=MeRespuesta)
