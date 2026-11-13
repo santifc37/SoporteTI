@@ -8,12 +8,19 @@ from sqlalchemy.orm import Session
 from app.services.adjuntos import registrar_adjunto, ErrorStorage
 
 from app.schemas.solucion import RegistrarSolucion
-
 from app.schemas.solicitud_informacion import (
     CrearSolicitudInformacion,
     SolicitudInformacionRespuesta,
 )
-from app.services.solicitudes_informacion import crear_solicitud_informacion
+from app.schemas.respuesta_informacion import (
+    CrearRespuestaInformacion,
+    RespuestaInformacionRespuesta,
+)
+from app.services.solicitudes_informacion import (
+    crear_solicitud_informacion,
+    consultar_solicitudes_informacion,
+    responder_solicitud_informacion,
+)
 
 from app.schemas.intervencion import CrearIntervencion, IntervencionRespuesta,IntervencionesRespuesta
 from app.services.intervenciones import registrar_intervencion,consultar_intervenciones
@@ -205,6 +212,9 @@ def obtener_intervenciones(
     return {"data": intervenciones}
 
 
+
+# ------------------------- RF-18: información adicional -------------------------
+
 @router.post(
     "/requests/{solicitud_id}/information-requests",
     status_code=201,
@@ -215,26 +225,75 @@ def crear_peticion_informacion(
     db: Session = Depends(get_db),
     usuario: UsuarioActual = Depends(get_current_user),
 ):
-    """RF-18: permite al técnico asignado solicitar información adicional."""
-
-    if usuario.rol != "tecnico":
-        raise ApiError(
-            403,
-            "SIN_PERMISO",
-            "Solo los técnicos pueden solicitar información adicional desde este módulo.",
-        )
+    """RF-18: técnico asignado o coordinador solicitan información."""
 
     peticion = crear_solicitud_informacion(
         db=db,
         solicitud_id=solicitud_id,
-        tecnico_id=usuario.id,
+        usuario_id=usuario.id,
+        rol=usuario.rol,
         datos=datos,
     )
 
     return {
         "mensaje": "Solicitud de información registrada correctamente",
-        "solicitud_informacion": SolicitudInformacionRespuesta.model_validate(peticion),
+        "solicitud_informacion": SolicitudInformacionRespuesta.model_validate(
+            peticion
+        ),
     }
+
+
+@router.get(
+    "/requests/{solicitud_id}/information-requests",
+)
+def obtener_peticiones_informacion(
+    solicitud_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    usuario: UsuarioActual = Depends(get_current_user),
+):
+    """RF-18: consulta las peticiones y sus respuestas."""
+
+    peticiones = consultar_solicitudes_informacion(
+        db=db,
+        solicitud_id=solicitud_id,
+        usuario_id=usuario.id,
+        rol=usuario.rol,
+    )
+
+    return {"data": peticiones}
+
+
+@router.post(
+    "/information-requests/{solicitud_informacion_id}/responses",
+    status_code=201,
+)
+def responder_peticion_informacion(
+    solicitud_informacion_id: uuid.UUID,
+    datos: CrearRespuestaInformacion,
+    db: Session = Depends(get_db),
+    usuario: UsuarioActual = Depends(get_current_user),
+):
+    """RF-18: el solicitante propietario responde una petición."""
+
+    if usuario.rol != "solicitante":
+        raise ApiError(
+            403,
+            "SIN_PERMISO",
+            "Solo el solicitante puede responder esta petición.",
+        )
+
+    respuesta = responder_solicitud_informacion(
+        db=db,
+        solicitud_informacion_id=solicitud_informacion_id,
+        solicitante_id=usuario.id,
+        datos=datos,
+    )
+
+    return {
+        "mensaje": "Respuesta registrada correctamente",
+        "respuesta": RespuestaInformacionRespuesta.model_validate(respuesta),
+    }
+
 
 
 @router.post("/requests/{solicitud_id}/resolve")

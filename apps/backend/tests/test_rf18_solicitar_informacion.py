@@ -14,6 +14,7 @@ from app.main import app
 from app.models import (
     Asignacion,
     Base,
+    RespuestaInformacion,
     Solicitud,
     SolicitudInformacion,
     Usuario,
@@ -21,6 +22,7 @@ from app.models import (
 
 
 URL = "/api/v1/requests"
+URL_RESPUESTAS = "/api/v1/information-requests"
 
 
 @pytest.fixture()
@@ -68,6 +70,7 @@ def crear_usuario(db, rol, nombre):
     )
     db.add(usuario)
     db.commit()
+    db.refresh(usuario)
     return usuario
 
 
@@ -85,6 +88,7 @@ def crear_solicitud(db, solicitante, tecnico, estado="asignado"):
     )
     db.add(solicitud)
     db.commit()
+    db.refresh(solicitud)
 
     asignacion = Asignacion(
         solicitud_id=solicitud.id,
@@ -107,6 +111,13 @@ def escenario(db):
     }
 
 
+def crear_peticion(client, solicitud):
+    return client.post(
+        f"{URL}/{solicitud.id}/information-requests",
+        json={"contenido": "Por favor, indique cuándo comenzó la falla."},
+    )
+
+
 def test_tecnico_asignado_puede_solicitar_informacion(
     client, db, escenario
 ):
@@ -115,10 +126,7 @@ def test_tecnico_asignado_puede_solicitar_informacion(
     )
     como(escenario["tecnico"])
 
-    respuesta = client.post(
-        f"{URL}/{solicitud.id}/information-requests",
-        json={"contenido": "Por favor, indique cuándo comenzó la falla."},
-    )
+    respuesta = crear_peticion(client, solicitud)
 
     assert respuesta.status_code == 201
     cuerpo = respuesta.json()
@@ -141,6 +149,22 @@ def test_tecnico_asignado_puede_solicitar_informacion(
     assert registrada.solicitud_id == solicitud.id
 
 
+def test_coordinador_puede_solicitar_informacion(
+    client, db, escenario
+):
+    solicitud = crear_solicitud(
+        db, escenario["solicitante"], escenario["tecnico"]
+    )
+    como(escenario["coordinador"])
+
+    respuesta = crear_peticion(client, solicitud)
+
+    assert respuesta.status_code == 201
+    assert respuesta.json()["solicitud_informacion"]["solicitado_por"] == (
+        str(escenario["coordinador"].id)
+    )
+
+
 def test_solicitar_informacion_no_cambia_estado_de_solicitud(
     client, db, escenario
 ):
@@ -153,10 +177,7 @@ def test_solicitar_informacion_no_cambia_estado_de_solicitud(
     estado_anterior = solicitud.estado
     como(escenario["tecnico"])
 
-    respuesta = client.post(
-        f"{URL}/{solicitud.id}/information-requests",
-        json={"contenido": "Necesitamos información adicional."},
-    )
+    respuesta = crear_peticion(client, solicitud)
 
     assert respuesta.status_code == 201
     db.refresh(solicitud)
@@ -171,28 +192,21 @@ def test_tecnico_no_asignado_no_puede_solicitar_informacion(
     )
     como(escenario["otro_tecnico"])
 
-    respuesta = client.post(
-        f"{URL}/{solicitud.id}/information-requests",
-        json={"contenido": "Solicito información adicional."},
-    )
+    respuesta = crear_peticion(client, solicitud)
 
     assert respuesta.status_code == 403
     assert respuesta.json()["error"]["codigo"] == "SIN_PERMISO"
 
 
-@pytest.mark.parametrize("rol", ["solicitante", "coordinador"])
-def test_otros_roles_no_pueden_usar_endpoint_de_tecnico(
-    client, db, escenario, rol
+def test_solicitante_no_puede_crear_peticion(
+    client, db, escenario
 ):
     solicitud = crear_solicitud(
         db, escenario["solicitante"], escenario["tecnico"]
     )
-    como(escenario[rol])
+    como(escenario["solicitante"])
 
-    respuesta = client.post(
-        f"{URL}/{solicitud.id}/information-requests",
-        json={"contenido": "Solicito información adicional."},
-    )
+    respuesta = crear_peticion(client, solicitud)
 
     assert respuesta.status_code == 403
     assert respuesta.json()["error"]["codigo"] == "SIN_PERMISO"
@@ -223,31 +237,15 @@ def test_solicitud_cerrada_no_admite_peticiones_de_informacion(
     )
     como(escenario["tecnico"])
 
-    respuesta = client.post(
-        f"{URL}/{solicitud.id}/information-requests",
-        json={"contenido": "Solicito información adicional."},
-    )
+    respuesta = crear_peticion(client, solicitud)
 
     assert respuesta.status_code == 409
     assert respuesta.json()["error"]["codigo"] == "SOLICITUD_CERRADA"
 
 
-def test_contenido_vacio_es_rechazado(client, db, escenario):
-    solicitud = crear_solicitud(
-        db, escenario["solicitante"], escenario["tecnico"]
-    )
-    como(escenario["tecnico"])
-
-    respuesta = client.post(
-        f"{URL}/{solicitud.id}/information-requests",
-        json={"contenido": ""},
-    )
-
-    assert respuesta.status_code == 422
-
-
-def test_contenido_con_solo_espacios_es_rechazado(
-    client, db, escenario
+@pytest.mark.parametrize("contenido", ["", "   "])
+def test_contenido_vacio_es_rechazado(
+    client, db, escenario, contenido
 ):
     solicitud = crear_solicitud(
         db, escenario["solicitante"], escenario["tecnico"]
@@ -256,7 +254,287 @@ def test_contenido_con_solo_espacios_es_rechazado(
 
     respuesta = client.post(
         f"{URL}/{solicitud.id}/information-requests",
-        json={"contenido": "   "},
+        json={"contenido": contenido},
+    )
+
+    assert respuesta.status_code == 422
+
+
+def test_solicitante_propietario_puede_consultar_peticiones(
+    client, db, escenario
+):
+    solicitud = crear_solicitud(
+        db, escenario["solicitante"], escenario["tecnico"]
+    )
+    como(escenario["tecnico"])
+    creada = crear_peticion(client, solicitud)
+    assert creada.status_code == 201
+
+    como(escenario["solicitante"])
+    respuesta = client.get(
+        f"{URL}/{solicitud.id}/information-requests"
+    )
+
+    assert respuesta.status_code == 200
+    peticiones = respuesta.json()["data"]
+    assert len(peticiones) == 1
+    assert peticiones[0]["contenido"] == (
+        "Por favor, indique cuándo comenzó la falla."
+    )
+    assert peticiones[0]["estado"] == "pendiente"
+    assert peticiones[0]["respuesta"] is None
+
+
+def test_tecnico_asignado_puede_consultar_peticiones(
+    client, db, escenario
+):
+    solicitud = crear_solicitud(
+        db, escenario["solicitante"], escenario["tecnico"]
+    )
+    como(escenario["tecnico"])
+    assert crear_peticion(client, solicitud).status_code == 201
+
+    respuesta = client.get(
+        f"{URL}/{solicitud.id}/information-requests"
+    )
+
+    assert respuesta.status_code == 200
+    assert len(respuesta.json()["data"]) == 1
+
+
+def test_coordinador_puede_consultar_peticiones(
+    client, db, escenario
+):
+    solicitud = crear_solicitud(
+        db, escenario["solicitante"], escenario["tecnico"]
+    )
+    como(escenario["tecnico"])
+    assert crear_peticion(client, solicitud).status_code == 201
+
+    como(escenario["coordinador"])
+    respuesta = client.get(
+        f"{URL}/{solicitud.id}/information-requests"
+    )
+
+    assert respuesta.status_code == 200
+    assert len(respuesta.json()["data"]) == 1
+
+
+def test_otro_solicitante_no_puede_consultar_peticiones(
+    client, db, escenario
+):
+    solicitud = crear_solicitud(
+        db, escenario["solicitante"], escenario["tecnico"]
+    )
+    otro_solicitante = crear_usuario(
+        db, "solicitante", "Pedro"
+    )
+    como(otro_solicitante)
+
+    respuesta = client.get(
+        f"{URL}/{solicitud.id}/information-requests"
+    )
+
+    assert respuesta.status_code == 403
+    assert respuesta.json()["error"]["codigo"] == "SIN_PERMISO"
+
+
+def test_solicitante_propietario_puede_responder_peticion(
+    client, db, escenario
+):
+    solicitud = crear_solicitud(
+        db, escenario["solicitante"], escenario["tecnico"]
+    )
+
+    como(escenario["tecnico"])
+    creada = crear_peticion(client, solicitud)
+    peticion_id = creada.json()["solicitud_informacion"]["id"]
+
+    como(escenario["solicitante"])
+    respuesta = client.post(
+        f"{URL_RESPUESTAS}/{peticion_id}/responses",
+        json={"contenido": "La falla comenzó esta mañana."},
+    )
+
+    assert respuesta.status_code == 201
+    cuerpo = respuesta.json()
+    assert cuerpo["mensaje"] == "Respuesta registrada correctamente"
+    assert cuerpo["respuesta"]["contenido"] == (
+        "La falla comenzó esta mañana."
+    )
+    assert cuerpo["respuesta"]["respondido_por"] == str(
+        escenario["solicitante"].id
+    )
+
+    peticion = db.scalar(
+        select(SolicitudInformacion).where(
+            SolicitudInformacion.id == uuid.UUID(peticion_id)
+        )
+    )
+    assert peticion.estado == "respondida"
+
+    respuesta_db = db.scalar(select(RespuestaInformacion))
+    assert respuesta_db is not None
+    assert respuesta_db.solicitud_informacion_id == peticion.id
+
+
+def test_responder_no_cambia_estado_de_solicitud(
+    client, db, escenario
+):
+    solicitud = crear_solicitud(
+        db,
+        escenario["solicitante"],
+        escenario["tecnico"],
+        estado="en_espera",
+    )
+
+    como(escenario["tecnico"])
+    creada = crear_peticion(client, solicitud)
+    peticion_id = creada.json()["solicitud_informacion"]["id"]
+
+    como(escenario["solicitante"])
+    respuesta = client.post(
+        f"{URL_RESPUESTAS}/{peticion_id}/responses",
+        json={"contenido": "Ya proporcioné la información."},
+    )
+
+    assert respuesta.status_code == 201
+    db.refresh(solicitud)
+    assert solicitud.estado == "en_espera"
+
+
+def test_otro_solicitante_no_puede_responder_peticion(
+    client, db, escenario
+):
+    solicitud = crear_solicitud(
+        db, escenario["solicitante"], escenario["tecnico"]
+    )
+
+    como(escenario["tecnico"])
+    creada = crear_peticion(client, solicitud)
+    peticion_id = creada.json()["solicitud_informacion"]["id"]
+
+    otro_solicitante = crear_usuario(
+        db, "solicitante", "Pedro"
+    )
+    como(otro_solicitante)
+
+    respuesta = client.post(
+        f"{URL_RESPUESTAS}/{peticion_id}/responses",
+        json={"contenido": "Respuesta no autorizada."},
+    )
+
+    assert respuesta.status_code == 403
+    assert respuesta.json()["error"]["codigo"] == "SIN_PERMISO"
+
+
+def test_tecnico_no_puede_responder_peticion(
+    client, db, escenario
+):
+    solicitud = crear_solicitud(
+        db, escenario["solicitante"], escenario["tecnico"]
+    )
+
+    como(escenario["tecnico"])
+    creada = crear_peticion(client, solicitud)
+    peticion_id = creada.json()["solicitud_informacion"]["id"]
+
+    respuesta = client.post(
+        f"{URL_RESPUESTAS}/{peticion_id}/responses",
+        json={"contenido": "Respuesta desde técnico."},
+    )
+
+    assert respuesta.status_code == 403
+    assert respuesta.json()["error"]["codigo"] == "SIN_PERMISO"
+
+
+def test_peticion_inexistente_devuelve_404(
+    client, escenario
+):
+    como(escenario["solicitante"])
+
+    respuesta = client.post(
+        f"{URL_RESPUESTAS}/{uuid.uuid4()}/responses",
+        json={"contenido": "Respuesta de prueba."},
+    )
+
+    assert respuesta.status_code == 404
+    assert respuesta.json()["error"]["codigo"] == (
+        "PETICION_NO_ENCONTRADA"
+    )
+
+
+def test_no_se_puede_responder_dos_veces(
+    client, db, escenario
+):
+    solicitud = crear_solicitud(
+        db, escenario["solicitante"], escenario["tecnico"]
+    )
+
+    como(escenario["tecnico"])
+    creada = crear_peticion(client, solicitud)
+    peticion_id = creada.json()["solicitud_informacion"]["id"]
+
+    como(escenario["solicitante"])
+    primera = client.post(
+        f"{URL_RESPUESTAS}/{peticion_id}/responses",
+        json={"contenido": "Primera respuesta."},
+    )
+    segunda = client.post(
+        f"{URL_RESPUESTAS}/{peticion_id}/responses",
+        json={"contenido": "Segunda respuesta."},
+    )
+
+    assert primera.status_code == 201
+    assert segunda.status_code == 409
+    assert segunda.json()["error"]["codigo"] in {
+        "PETICION_NO_PENDIENTE",
+        "PETICION_YA_RESPONDIDA",
+    }
+
+
+def test_no_se_puede_responder_peticion_de_solicitud_cerrada(
+    client, db, escenario
+):
+    solicitud = crear_solicitud(
+        db,
+        escenario["solicitante"],
+        escenario["tecnico"],
+    )
+
+    como(escenario["tecnico"])
+    creada = crear_peticion(client, solicitud)
+    peticion_id = creada.json()["solicitud_informacion"]["id"]
+
+    solicitud.estado = "cerrado"
+    db.commit()
+
+    como(escenario["solicitante"])
+    respuesta = client.post(
+        f"{URL_RESPUESTAS}/{peticion_id}/responses",
+        json={"contenido": "Respuesta tardía."},
+    )
+
+    assert respuesta.status_code == 409
+    assert respuesta.json()["error"]["codigo"] == "SOLICITUD_CERRADA"
+
+
+@pytest.mark.parametrize("contenido", ["", "   "])
+def test_respuesta_vacia_es_rechazada(
+    client, db, escenario, contenido
+):
+    solicitud = crear_solicitud(
+        db, escenario["solicitante"], escenario["tecnico"]
+    )
+
+    como(escenario["tecnico"])
+    creada = crear_peticion(client, solicitud)
+    peticion_id = creada.json()["solicitud_informacion"]["id"]
+
+    como(escenario["solicitante"])
+    respuesta = client.post(
+        f"{URL_RESPUESTAS}/{peticion_id}/responses",
+        json={"contenido": contenido},
     )
 
     assert respuesta.status_code == 422
