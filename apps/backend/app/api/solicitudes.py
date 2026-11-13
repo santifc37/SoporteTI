@@ -1,11 +1,21 @@
 
 import uuid
 from datetime import datetime
-
+from urllib.parse import quote
 from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.services.adjuntos import registrar_adjunto, ErrorStorage
+
+
+from fastapi.responses import Response
+
+from app.services.adjuntos_solicitudes import (
+    registrar_adjunto_solicitud,
+    consultar_adjuntos_solicitud,
+    descargar_adjunto,
+)
+
 
 from app.schemas.solucion import RegistrarSolucion
 from app.schemas.solicitud_informacion import (
@@ -468,4 +478,113 @@ def clasificar(
             prioridad=solicitud.prioridad,
             estado=solicitud.estado,
         ),
+    )
+
+
+
+# ------------------------------ RF-08: adjuntos en solicitudes ------------------------------
+
+
+@router.post(
+    "/requests/{solicitud_id}/attachments",
+    status_code=201,
+)
+def adjuntar_archivo_solicitud(
+    solicitud_id: uuid.UUID,
+    archivo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    usuario: UsuarioActual = Depends(get_current_user),
+):
+    """RF-08: adjunta una imagen directamente a una solicitud."""
+
+    try:
+        adjunto = registrar_adjunto_solicitud(
+            db=db,
+            solicitud_id=solicitud_id,
+            usuario_id=usuario.id,
+            rol=usuario.rol,
+            archivo=archivo,
+        )
+    except ErrorStorage as error:
+        raise ApiError(
+            502,
+            "ERROR_ALMACENAMIENTO",
+            "No fue posible almacenar la imagen.",
+        ) from error
+
+    return {
+        "mensaje": "Archivo adjuntado correctamente",
+        "adjunto": {
+            "id": adjunto.id,
+            "solicitud_id": adjunto.solicitud_id,
+            "nombre_archivo": adjunto.nombre_archivo,
+            "tipo_archivo": adjunto.tipo_archivo,
+            "tamano": adjunto.tamano,
+            "fecha_subida": adjunto.fecha_subida,
+        },
+    }
+
+
+@router.get("/requests/{solicitud_id}/attachments")
+def obtener_adjuntos_solicitud(
+    solicitud_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    usuario: UsuarioActual = Depends(get_current_user),
+):
+    """RF-08: consulta los archivos asociados directamente a una solicitud."""
+
+    adjuntos = consultar_adjuntos_solicitud(
+        db=db,
+        solicitud_id=solicitud_id,
+        usuario_id=usuario.id,
+        rol=usuario.rol,
+    )
+
+    return {
+        "data": [
+            {
+                "id": adjunto.id,
+                "nombre_archivo": adjunto.nombre_archivo,
+                "tipo_archivo": adjunto.tipo_archivo,
+                "tamano": adjunto.tamano,
+                "subido_por": adjunto.subido_por,
+                "fecha_subida": adjunto.fecha_subida,
+            }
+            for adjunto in adjuntos
+        ]
+    }
+
+
+@router.get("/attachments/{adjunto_id}/download")
+def descargar_archivo_adjunto(
+    adjunto_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    usuario: UsuarioActual = Depends(get_current_user),
+):
+    """RF-08: descarga un archivo después de validar los permisos."""
+
+    try:
+        adjunto, contenido = descargar_adjunto(
+            db=db,
+            adjunto_id=adjunto_id,
+            usuario_id=usuario.id,
+            rol=usuario.rol,
+        )
+    except ErrorStorage as error:
+        raise ApiError(
+            502,
+            "ERROR_ALMACENAMIENTO",
+            "No fue posible recuperar el archivo.",
+        ) from error
+
+    nombre_codificado = quote(adjunto.nombre_archivo)
+
+    return Response(
+        content=contenido,
+        media_type=adjunto.tipo_archivo,
+        headers={
+            "Content-Disposition": (
+                f"attachment; filename*=UTF-8''{nombre_codificado}"
+            )
+        },
     )
