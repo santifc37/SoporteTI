@@ -1,4 +1,5 @@
-"""Endpoints de usuarios: RF-03 y RF-05 (docs/contrato-api.md §5)."""
+
+"""Endpoints de usuarios: RF-03, RF-04 y RF-05."""
 
 import uuid
 
@@ -8,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import UsuarioActual, get_current_user
 from app.api.permisos import requiere_rol
 from app.database.session import get_db
+from app.schemas.auth import RestablecerContrasenaPeticion, MensajeRespuesta
 from app.schemas.pagination import Pagination, calcular_total_paginas
 from app.schemas.usuarios import (
     Rol,
@@ -19,6 +21,7 @@ from app.schemas.usuarios import (
     UsuarioResumen,
     UsuariosPagina,
 )
+from app.services.autenticacion import restablecer_contrasena
 from app.services.usuarios import (
     actualizar_usuario,
     crear_usuario,
@@ -78,6 +81,21 @@ def crear(datos: UsuarioCrear, db: Session = Depends(get_db)):
     )
 
 
+@router.post(
+    "/{usuario_id}/reset-password",
+    response_model=MensajeRespuesta,
+    dependencies=[Depends(solo_coordinador)],
+)
+def restablecer_clave(
+    usuario_id: uuid.UUID,
+    datos: RestablecerContrasenaPeticion,
+    db: Session = Depends(get_db),
+):
+    """Permite al coordinador asignar una contraseña temporal (RF-04)."""
+    restablecer_contrasena(db, usuario_id, datos.contrasena_temporal)
+    return MensajeRespuesta(mensaje="Contraseña restablecida correctamente")
+
+
 @router.patch("/{usuario_id}", response_model=UsuarioMensaje)
 def actualizar(
     usuario_id: uuid.UUID,
@@ -85,11 +103,7 @@ def actualizar(
     actor: UsuarioActual = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Modifica una cuenta.
-
-    El coordinador puede cambiar cualquier dato administrativo; cada usuario
-    solo su nombre y sus datos de contacto (RF-05).
-    """
+    """Modifica una cuenta (RF-05)."""
     usuario = actualizar_usuario(db, actor, usuario_id, datos)
     return UsuarioMensaje(
         mensaje="Usuario actualizado correctamente",
