@@ -8,6 +8,7 @@ from app.api.cierres import router as cierres_router
 from app.api.estadisticas import router as estadisticas_router
 from app.api.health import router as health_router
 from app.api.historial import router as historial_router
+from app.api.mensajes import router as mensajes_router
 from app.api.peticiones_informacion import router as peticiones_informacion_router
 from app.api.solicitudes import router as solicitudes_router
 from app.api.usuarios import router as usuarios_router
@@ -25,3 +26,4 @@ api_router.include_router(cierres_router)
 api_router.include_router(estadisticas_router)
 api_router.include_router(historial_router)
 api_router.include_router(peticiones_informacion_router)
+api_router.include_router(mensajes_router)
