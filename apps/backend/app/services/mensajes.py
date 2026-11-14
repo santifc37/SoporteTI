@@ -19,10 +19,11 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import ApiError
-from app.models import Mensaje, Solicitud, Usuario
+from app.models import Asignacion, Mensaje, Solicitud, Usuario
 from app.schemas.mensajes import EnviarMensaje, MensajeConversacion, MensajesLista, Remitente
 from app.schemas.pagination import Pagination, calcular_total_paginas
 from app.services.historial import _puede_consultar
+from app.services.notificaciones import notificar, referencia
 
 
 def _solicitud_accesible(
@@ -117,6 +118,24 @@ def enviar_mensaje(
         contenido=datos.contenido,
     )
     db.add(mensaje)
+
+    # RF-27: avisa a los demás participantes directos (no al remitente).
+    tecnico_id = db.scalar(
+        select(Asignacion.tecnico_id).where(
+            Asignacion.solicitud_id == solicitud.id,
+            Asignacion.fecha_finalizacion.is_(None),
+        )
+    )
+    destinatarios = {solicitud.solicitante_id, tecnico_id} - {None, usuario_id}
+    for destinatario in destinatarios:
+        notificar(
+            db,
+            destinatario,
+            solicitud,
+            "nuevo_mensaje",
+            f"Hay un mensaje nuevo en la solicitud {referencia(solicitud)}.",
+        )
+
     db.commit()
     db.refresh(mensaje)
     return mensaje

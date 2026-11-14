@@ -23,6 +23,7 @@ from app.core.errors import ApiError
 from app.models import Asignacion, Solicitud, Usuario
 from app.models.historial_cambio import HistorialCambio
 from app.schemas.asignacion import AsignacionHistorial, AsignarTecnico
+from app.services.notificaciones import notificar, referencia
 from app.services.solicitudes import _solicitud_para_modificar
 
 # Estados en los que la solicitud ya tiene técnico y se puede reasignar.
@@ -137,6 +138,25 @@ def asignar_tecnico(
             fecha_asignacion=ahora,
         )
         db.add(nueva)
+
+        # RF-27: avisos internos que se guardan en la misma transacción.
+        ref = referencia(solicitud)
+        notificar(db, tecnico.id, solicitud, "asignacion", f"Se te asignó la solicitud {ref}.")
+        notificar(
+            db,
+            solicitud.solicitante_id,
+            solicitud,
+            "tecnico_asignado",
+            f"Tu solicitud {ref} fue asignada a {_nombre(tecnico)}.",
+        )
+        if anterior is not None:
+            notificar(
+                db,
+                anterior.tecnico_id,
+                solicitud,
+                "reasignacion",
+                f"La solicitud {ref} fue reasignada a otro técnico.",
+            )
 
         solicitud.fecha_actualizacion = ahora
         solicitud.version += 1

@@ -26,6 +26,7 @@ from app.schemas.respuesta_informacion import (
     RespuestaInformacionRespuesta,
 )
 from app.services.historial import _puede_consultar
+from app.services.notificaciones import notificar, referencia
 
 
 def listar_peticiones_informacion(
@@ -123,6 +124,15 @@ def responder_peticion_informacion(
         contenido=datos.contenido,
     )
     peticion.estado = "respondida"
+
+    # RF-27: avisa a quien hizo la petición; se guarda junto con la respuesta.
+    notificar(
+        db,
+        peticion.solicitado_por,
+        solicitud,
+        "respuesta_informacion",
+        f"El solicitante respondió tu petición de información en {referencia(solicitud)}.",
+    )
 
     try:
         db.add(respuesta)
