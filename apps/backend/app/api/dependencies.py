@@ -23,9 +23,9 @@ class UsuarioActual:
     apellido: str
     correo: str
     activo: bool
-    telefono: str | None
-    medio_contacto_preferido: str
     sesion_id: uuid.UUID
+    telefono: str | None = None
+    medio_contacto_preferido: str = "correo"
 
 
 def get_current_user(

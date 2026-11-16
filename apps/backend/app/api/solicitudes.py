@@ -39,6 +39,9 @@ from app.schemas.solicitud import (
 )
 
 from app.services.adjuntos import registrar_adjunto, ErrorStorage
+from app.services.adjuntos_intervenciones import (
+    consultar_adjuntos_intervencion,
+)
 from app.services.adjuntos_solicitudes import (
     registrar_adjunto_solicitud,
     consultar_adjuntos_solicitud,
@@ -85,14 +88,7 @@ def consultar_solicitudes(
     db: Session = Depends(get_db),
     usuario: UsuarioActual = Depends(get_current_user),
 ):
-    """Consulta las solicitudes a las que tiene acceso el usuario (RF-07, RF-13).
-
-    - Técnico: solo las que tiene asignadas actualmente.
-    - Solicitante: solo las propias.
-    - Coordinador: todas; además puede filtrar por solicitante, técnico y tipo de cierre.
-
-    Los filtros nunca amplían los permisos (contrato-api.md §17).
-    """
+    """Consulta las solicitudes a las que tiene acceso el usuario (RF-07, RF-13)."""
 
     if fecha_desde and fecha_hasta and fecha_desde > fecha_hasta:
         raise ApiError(
@@ -360,6 +356,35 @@ def adjuntar_imagen_intervencion(
             "fecha_subida": adjunto.fecha_subida,
         },
     }
+
+
+@router.get(
+    "/requests/{solicitud_id}/interventions/{intervencion_id}/attachments"
+)
+def obtener_adjuntos_intervencion(
+    solicitud_id: uuid.UUID,
+    intervencion_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    usuario: UsuarioActual = Depends(get_current_user),
+):
+    """RF-25: consulta las imágenes asociadas a una intervención."""
+
+    try:
+        adjuntos = consultar_adjuntos_intervencion(
+            db=db,
+            solicitud_id=solicitud_id,
+            intervencion_id=intervencion_id,
+            usuario_id=usuario.id,
+            rol=usuario.rol,
+        )
+    except ErrorStorage as error:
+        raise ApiError(
+            502,
+            "ERROR_ALMACENAMIENTO",
+            "No fue posible recuperar las imágenes de la intervención.",
+        ) from error
+
+    return {"data": adjuntos}
 
 
 # ------------------------------ RF-06: crear solicitud ------------------------------
