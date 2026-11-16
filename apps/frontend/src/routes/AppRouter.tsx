@@ -10,9 +10,14 @@ import {
 import { PanelLayout } from '../layouts/PanelLayout'
 import { AuthProvider, useAuth } from '../hooks/useAuth'
 import { LoginPage } from '../pages/LoginPage'
+
 import { SolicitanteDashboardPage } from '../pages/solicitante/SolicitanteDashboardPage'
 import { PerfilSolicitantePage } from '../pages/solicitante/PerfilSolicitantePage'
 import { CambiarContrasenaPage } from '../pages/solicitante/CambiarContrasenaPage'
+
+import { SolicitudesAsignadasPage } from '../pages/tecnico/SolicitudesAsignadasPage'
+import { DetalleSolicitudTecnicoPage } from '../pages/tecnico/DetalleSolicitudTecnicoPage'
+
 import { RutaProtegida } from './RutaProtegida'
 
 function InicioSegunRol() {
@@ -71,6 +76,40 @@ function ModuloPendiente() {
   )
 }
 
+function PanelTecnico() {
+  const ubicacion = useLocation()
+
+  const titulos: Record<string, string> = {
+    '/tecnico': 'Solicitudes asignadas',
+  }
+
+  const esDetalle = ubicacion.pathname.startsWith('/tecnico/')
+
+  return (
+    <PanelLayout
+      titulo={
+        esDetalle
+          ? 'Detalle de solicitud'
+          : titulos[ubicacion.pathname] ?? 'Panel del técnico'
+      }
+      navegacion={[
+        {
+          nombre: 'Solicitudes asignadas',
+          ruta: '/tecnico',
+        },
+      ]}
+    >
+      <Routes>
+        <Route index element={<SolicitudesAsignadasPage />} />
+        <Route
+          path="solicitud/:solicitudId"
+          element={<DetalleSolicitudTecnicoPage />}
+        />
+      </Routes>
+    </PanelLayout>
+  )
+}
+
 function PanelSolicitante() {
   const ubicacion = useLocation()
 
@@ -121,7 +160,7 @@ function RutasAplicacion() {
         <Route
           element={<RutaProtegida rolesPermitidos={['tecnico']} />}
         >
-          <Route path="/tecnico/*" element={<ModuloPendiente />} />
+          <Route path="/tecnico/*" element={<PanelTecnico />} />
         </Route>
 
         <Route

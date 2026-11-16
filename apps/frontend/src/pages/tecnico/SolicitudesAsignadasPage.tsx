@@ -1,5 +1,6 @@
 
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 
 import { Boton } from '../../components/Boton'
 import { Cargando } from '../../components/Cargando'
@@ -67,7 +68,7 @@ function TarjetaSolicitud({
   solicitud: SolicitudResumen
 }) {
   return (
-    <article className="rounded-xl border border-panel bg-tarjeta p-5 shadow-sm">
+    <article className="rounded-xl border border-panel bg-tarjeta p-5 shadow-sm transition hover:border-blue-300 hover:shadow-md">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-texto-secundario">
@@ -134,6 +135,16 @@ function TarjetaSolicitud({
             {solicitud.tecnico_asignado?.nombre ?? 'Sin asignar'}
           </p>
         </div>
+      </div>
+
+      <div className="mt-5 flex justify-end border-t border-panel pt-4">
+        <Link
+          to={`/tecnico/solicitud/${solicitud.id}`}
+          className="inline-flex items-center gap-2 rounded-lg bg-primario px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-accion"
+        >
+          Ver solicitud
+          <span aria-hidden="true">→</span>
+        </Link>
       </div>
     </article>
   )
@@ -220,7 +231,7 @@ export function SolicitudesAsignadasPage() {
           Solicitudes asignadas
         </h1>
         <p className="mt-1 text-sm text-texto-secundario">
-          Consulta y filtra las solicitudes que tienes asignadas.
+          Consulta y gestiona las solicitudes que tienes asignadas.
         </p>
       </div>
 
