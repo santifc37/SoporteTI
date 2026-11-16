@@ -1,3 +1,4 @@
+
 import {
   BrowserRouter,
   Navigate,
@@ -8,6 +9,7 @@ import {
 import { PanelLayout } from '../layouts/PanelLayout'
 import { AuthProvider, useAuth } from '../hooks/useAuth'
 import { LoginPage } from '../pages/LoginPage'
+import { SolicitanteDashboardPage } from '../pages/solicitante/SolicitanteDashboardPage'
 import { RutaProtegida } from './RutaProtegida'
 
 function InicioSegunRol() {
@@ -28,11 +30,8 @@ function InicioSegunRol() {
   return <Navigate to="/coordinador" replace />
 }
 
-
-
 function ModuloPendiente() {
   const { usuario } = useAuth()
-
   const rol = usuario?.rol
 
   const configuracion = {
@@ -40,17 +39,13 @@ function ModuloPendiente() {
       titulo: 'Panel del técnico',
       ruta: '/tecnico',
     },
-    solicitante: {
-      titulo: 'Panel del solicitante',
-      ruta: '/solicitante',
-    },
     coordinador: {
       titulo: 'Panel del coordinador',
       ruta: '/coordinador',
     },
   }
 
-  if (!rol) {
+  if (!rol || rol === 'solicitante') {
     return null
   }
 
@@ -59,12 +54,7 @@ function ModuloPendiente() {
   return (
     <PanelLayout
       titulo={panel.titulo}
-      navegacion={[
-        {
-          nombre: 'Inicio',
-          ruta: panel.ruta,
-        },
-      ]}
+      navegacion={[{ nombre: 'Inicio', ruta: panel.ruta }]}
     >
       <section className="rounded-xl border border-panel bg-tarjeta p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-texto">
@@ -78,7 +68,21 @@ function ModuloPendiente() {
   )
 }
 
-
+function PanelSolicitante() {
+  return (
+    <PanelLayout
+      titulo="Panel del solicitante"
+      navegacion={[
+        {
+          nombre: 'Mis casos',
+          ruta: '/solicitante',
+        },
+      ]}
+    >
+      <SolicitanteDashboardPage />
+    </PanelLayout>
+  )
+}
 
 function RutasAplicacion() {
   return (
@@ -89,25 +93,23 @@ function RutasAplicacion() {
         <Route path="/" element={<InicioSegunRol />} />
 
         <Route
-          element={
-            <RutaProtegida rolesPermitidos={['tecnico']} />
-          }
+          element={<RutaProtegida rolesPermitidos={['tecnico']} />}
         >
           <Route path="/tecnico/*" element={<ModuloPendiente />} />
         </Route>
 
         <Route
-          element={
-            <RutaProtegida rolesPermitidos={['solicitante']} />
-          }
+          element={<RutaProtegida rolesPermitidos={['solicitante']} />}
         >
-          <Route path="/solicitante/*" element={<ModuloPendiente />} />
+          <Route path="/solicitante/*" element={<PanelSolicitante />} />
         </Route>
       </Route>
 
-         <Route element={<RutaProtegida rolesPermitidos={['coordinador']} />}>
+      <Route
+        element={<RutaProtegida rolesPermitidos={['coordinador']} />}
+      >
         <Route path="/coordinador/*" element={<ModuloPendiente />} />
-    </Route>
+      </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

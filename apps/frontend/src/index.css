@@ -1,24 +1,27 @@
 @import "tailwindcss";
+
 @theme {
-  --color-primario: #173B67;
-  --color-accion: #2563EB;
+  --color-primario: #173b67;
+  --color-primario-oscuro: #102c4e;
+  --color-accion: #2563eb;
 
-  --color-fondo: #E2E8F0;
-  --color-panel: #CBD5E1;
-  --color-tarjeta: #F8FAFC;
+  --color-fondo: #eef2f7;
+  --color-panel: #dbe3ed;
+  --color-tarjeta: #ffffff;
 
-  --color-exito: #16A34A;
-  --color-advertencia: #D97706;
-  --color-error: #DC2626;
+  --color-exito: #16a34a;
+  --color-advertencia: #d97706;
+  --color-error: #dc2626;
 
   --color-texto: #172033;
-  --color-texto-secundario: #64748B;
+  --color-texto-secundario: #64748b;
 }
 
 :root {
-  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #172033;
-  background: #E2E8F0;
+  background: #eef2f7;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -29,11 +32,17 @@
   box-sizing: border-box;
 }
 
+html {
+  min-width: 320px;
+  min-height: 100%;
+  scroll-behavior: smooth;
+}
+
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: #E2E8F0;
+  background: #eef2f7;
 }
 
 button,
@@ -41,4 +50,26 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+::selection {
+  color: #ffffff;
+  background: #2563eb;
+}
+
+:focus-visible {
+  outline: 3px solid rgb(37 99 235 / 35%);
+  outline-offset: 2px;
+}
+
+#root {
+  min-height: 100vh;
 }

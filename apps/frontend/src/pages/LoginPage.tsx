@@ -14,9 +14,14 @@ export function LoginPage() {
 
   if (cargando) {
     return (
-      <p className="p-6 text-center text-texto">
-        Verificando sesión...
-      </p>
+      <main className="flex min-h-screen items-center justify-center bg-fondo">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-9 w-9 animate-spin rounded-full border-4 border-blue-100 border-t-accion" />
+          <p className="text-sm text-texto-secundario">
+            Verificando sesión...
+          </p>
+        </div>
+      </main>
     )
   }
 
@@ -62,17 +67,21 @@ export function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-fondo px-4 py-8">
-      <section className="w-full max-w-md rounded-2xl border border-panel bg-tarjeta p-8 shadow-xl">
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-primario">
+    <main className="flex min-h-screen items-center justify-center bg-fondo px-5 py-10">
+      <section className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-7 shadow-sm sm:p-9">
+        <header className="mb-8 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-primario text-2xl font-bold text-white">
+            S
+          </div>
+
+          <h1 className="text-2xl font-bold text-primario">
             SoporteTI
           </h1>
 
           <p className="mt-2 text-sm text-texto-secundario">
-            Sistema de gestión de solicitudes de soporte
+            Inicio de sesión
           </p>
-        </div>
+        </header>
 
         <form onSubmit={manejarEnvio} className="space-y-5">
           <div>
@@ -90,8 +99,8 @@ export function LoginPage() {
               onChange={(evento) => setCorreo(evento.target.value)}
               required
               autoComplete="username"
-              className="w-full rounded-lg border border-panel bg-white px-4 py-3 text-texto outline-none transition focus:border-accion focus:ring-2 focus:ring-accion/20"
               placeholder="usuario@correo.com"
+              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-texto outline-none transition placeholder:text-slate-400 focus:border-accion focus:ring-2 focus:ring-blue-100"
             />
           </div>
 
@@ -110,25 +119,34 @@ export function LoginPage() {
               onChange={(evento) => setContrasena(evento.target.value)}
               required
               autoComplete="current-password"
-              className="w-full rounded-lg border border-panel bg-white px-4 py-3 text-texto outline-none transition focus:border-accion focus:ring-2 focus:ring-accion/20"
               placeholder="Ingresa tu contraseña"
+              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-texto outline-none transition placeholder:text-slate-400 focus:border-accion focus:ring-2 focus:ring-blue-100"
             />
           </div>
 
           {error && (
-            <p className="rounded-lg border border-error/20 bg-error/10 p-3 text-sm text-error">
+            <div
+              role="alert"
+              className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+            >
               {error}
-            </p>
+            </div>
           )}
 
           <button
             type="submit"
             disabled={enviando}
-            className="w-full rounded-lg bg-primario px-4 py-3 font-semibold text-white transition hover:bg-accion disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-lg bg-primario px-4 py-3 text-sm font-semibold text-white transition hover:bg-accion disabled:cursor-not-allowed disabled:opacity-60"
           >
             {enviando ? 'Ingresando...' : 'Iniciar sesión'}
           </button>
         </form>
+
+        <footer className="mt-8 border-t border-slate-100 pt-5 text-center">
+          <p className="text-xs text-texto-secundario">
+            Sistema de gestión de soporte técnico
+          </p>
+        </footer>
       </section>
     </main>
   )
