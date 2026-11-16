@@ -102,14 +102,14 @@ def crear_solicitud_informacion(
         if asignacion is None:
             raise ApiError(
                 403,
-                "SIN_PERMISO",
+                "PERMISO_DENEGADO",
                 "No tienes una asignación activa para esta solicitud.",
             )
 
     elif rol != "coordinador":
         raise ApiError(
             403,
-            "SIN_PERMISO",
+            "PERMISO_DENEGADO",
             "No tienes permiso para solicitar información adicional.",
         )
 

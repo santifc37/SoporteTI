@@ -78,7 +78,7 @@ def crear_solicitud(db, solicitante, tecnico, estado="asignado"):
     solicitud = Solicitud(
         numero=f"ST-{uuid.uuid4().hex[:6]}",
         titulo="Solicitud de prueba",
-        descripcion="Descripción de prueba",
+        descripcion="DescripciÃ³n de prueba",
         tipo="incidente",
         solicitante_id=solicitante.id,
         ubicacion="Oficina",
@@ -114,7 +114,7 @@ def escenario(db):
 def crear_peticion(client, solicitud):
     return client.post(
         f"{URL}/{solicitud.id}/information-requests",
-        json={"contenido": "Por favor, indique cuándo comenzó la falla."},
+        json={"contenido": "Por favor, indique cuÃ¡ndo comenzÃ³ la falla."},
     )
 
 
@@ -139,7 +139,7 @@ def test_tecnico_asignado_puede_solicitar_informacion(
     assert peticion["solicitud_id"] == str(solicitud.id)
     assert peticion["solicitado_por"] == str(escenario["tecnico"].id)
     assert peticion["contenido"] == (
-        "Por favor, indique cuándo comenzó la falla."
+        "Por favor, indique cuÃ¡ndo comenzÃ³ la falla."
     )
     assert peticion["estado"] == "pendiente"
     assert peticion["fecha_solicitud"] is not None
@@ -195,7 +195,7 @@ def test_tecnico_no_asignado_no_puede_solicitar_informacion(
     respuesta = crear_peticion(client, solicitud)
 
     assert respuesta.status_code == 403
-    assert respuesta.json()["error"]["codigo"] == "SIN_PERMISO"
+    assert respuesta.json()["error"]["codigo"] == "PERMISO_DENEGADO"
 
 
 def test_solicitante_no_puede_crear_peticion(
@@ -209,7 +209,7 @@ def test_solicitante_no_puede_crear_peticion(
     respuesta = crear_peticion(client, solicitud)
 
     assert respuesta.status_code == 403
-    assert respuesta.json()["error"]["codigo"] == "SIN_PERMISO"
+    assert respuesta.json()["error"]["codigo"] == "PERMISO_DENEGADO"
 
 
 def test_solicitud_inexistente_devuelve_404(client, escenario):
@@ -279,7 +279,7 @@ def test_solicitante_propietario_puede_consultar_peticiones(
     peticiones = respuesta.json()["data"]
     assert len(peticiones) == 1
     assert peticiones[0]["contenido"] == (
-        "Por favor, indique cuándo comenzó la falla."
+        "Por favor, indique cuÃ¡ndo comenzÃ³ la falla."
     )
     assert peticiones[0]["estado"] == "pendiente"
     assert peticiones[0]["respuesta"] is None
@@ -336,7 +336,7 @@ def test_otro_solicitante_no_puede_consultar_peticiones(
     )
 
     assert respuesta.status_code == 403
-    assert respuesta.json()["error"]["codigo"] == "SIN_PERMISO"
+    assert respuesta.json()["error"]["codigo"] == "PERMISO_DENEGADO"
 
 
 def test_solicitante_propietario_puede_responder_peticion(
@@ -353,14 +353,14 @@ def test_solicitante_propietario_puede_responder_peticion(
     como(escenario["solicitante"])
     respuesta = client.post(
         f"{URL_RESPUESTAS}/{peticion_id}/responses",
-        json={"contenido": "La falla comenzó esta mañana."},
+        json={"contenido": "La falla comenzÃ³ esta maÃ±ana."},
     )
 
     assert respuesta.status_code == 201
     cuerpo = respuesta.json()
     assert cuerpo["mensaje"] == "Respuesta registrada correctamente"
     assert cuerpo["respuesta"]["contenido"] == (
-        "La falla comenzó esta mañana."
+        "La falla comenzÃ³ esta maÃ±ana."
     )
     assert cuerpo["respuesta"]["respondido_por"] == str(
         escenario["solicitante"].id
@@ -395,7 +395,7 @@ def test_responder_no_cambia_estado_de_solicitud(
     como(escenario["solicitante"])
     respuesta = client.post(
         f"{URL_RESPUESTAS}/{peticion_id}/responses",
-        json={"contenido": "Ya proporcioné la información."},
+        json={"contenido": "Ya proporcionÃ© la información."},
     )
 
     assert respuesta.status_code == 201
@@ -425,7 +425,7 @@ def test_otro_solicitante_no_puede_responder_peticion(
     )
 
     assert respuesta.status_code == 403
-    assert respuesta.json()["error"]["codigo"] == "SIN_PERMISO"
+    assert respuesta.json()["error"]["codigo"] == "PERMISO_DENEGADO"
 
 
 def test_tecnico_no_puede_responder_peticion(
@@ -441,11 +441,11 @@ def test_tecnico_no_puede_responder_peticion(
 
     respuesta = client.post(
         f"{URL_RESPUESTAS}/{peticion_id}/responses",
-        json={"contenido": "Respuesta desde técnico."},
+        json={"contenido": "Respuesta desde tÃ©cnico."},
     )
 
     assert respuesta.status_code == 403
-    assert respuesta.json()["error"]["codigo"] == "SIN_PERMISO"
+    assert respuesta.json()["error"]["codigo"] == "PERMISO_DENEGADO"
 
 
 def test_peticion_inexistente_devuelve_404(
@@ -460,7 +460,7 @@ def test_peticion_inexistente_devuelve_404(
 
     assert respuesta.status_code == 404
     assert respuesta.json()["error"]["codigo"] == (
-        "PETICION_NO_ENCONTRADA"
+        "RECURSO_NO_ENCONTRADO"
     )
 
 
@@ -512,7 +512,7 @@ def test_no_se_puede_responder_peticion_de_solicitud_cerrada(
     como(escenario["solicitante"])
     respuesta = client.post(
         f"{URL_RESPUESTAS}/{peticion_id}/responses",
-        json={"contenido": "Respuesta tardía."},
+        json={"contenido": "Respuesta tardÃ­a."},
     )
 
     assert respuesta.status_code == 409

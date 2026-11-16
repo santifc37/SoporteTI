@@ -253,56 +253,6 @@ def crear_peticion_informacion(
     }
 
 
-@router.get(
-    "/requests/{solicitud_id}/information-requests",
-)
-def obtener_peticiones_informacion(
-    solicitud_id: uuid.UUID,
-    db: Session = Depends(get_db),
-    usuario: UsuarioActual = Depends(get_current_user),
-):
-    """RF-18: consulta las peticiones y sus respuestas."""
-
-    peticiones = consultar_solicitudes_informacion(
-        db=db,
-        solicitud_id=solicitud_id,
-        usuario_id=usuario.id,
-        rol=usuario.rol,
-    )
-
-    return {"data": peticiones}
-
-
-@router.post(
-    "/information-requests/{solicitud_informacion_id}/responses",
-    status_code=201,
-)
-def responder_peticion_informacion(
-    solicitud_informacion_id: uuid.UUID,
-    datos: CrearRespuestaInformacion,
-    db: Session = Depends(get_db),
-    usuario: UsuarioActual = Depends(get_current_user),
-):
-    """RF-18: el solicitante propietario responde una petición."""
-
-    if usuario.rol != "solicitante":
-        raise ApiError(
-            403,
-            "SIN_PERMISO",
-            "Solo el solicitante puede responder esta petición.",
-        )
-
-    respuesta = responder_solicitud_informacion(
-        db=db,
-        solicitud_informacion_id=solicitud_informacion_id,
-        solicitante_id=usuario.id,
-        datos=datos,
-    )
-
-    return {
-        "mensaje": "Respuesta registrada correctamente",
-        "respuesta": RespuestaInformacionRespuesta.model_validate(respuesta),
-    }
 
 
 
