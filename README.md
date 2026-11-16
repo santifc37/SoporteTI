@@ -1,35 +1,68 @@
-
 # SoporteTI
 
-Sistema web para la gestión de solicitudes de soporte de tecnologías de la información (TI). Permite centralizar el registro, clasificación, asignación y atención de solicitudes, así como mantener la comunicación y trazabilidad de cada caso.
+Sistema web para la gestión de solicitudes de soporte de tecnologías de la información. Permite registrar, evaluar, clasificar, asignar y atender solicitudes, mantener la comunicación entre los participantes y conservar la trazabilidad de cada caso.
 
-## 1. Documentación del proyecto
+**Asignatura:** Aplicaciones y Servicios Web  
+**Institución:** Instituto Tecnológico Metropolitano (ITM)  
+**Repositorio:** https://github.com/santifc37/SoporteTI
 
-La documentación detallada se encuentra en la carpeta `docs/`:
+---
 
-| Documento | Contenido |
-|---|---|
-| `docs/requisitos.md` | Requisitos funcionales y no funcionales. |
-| `docs/diseno.md` | Arquitectura y decisiones técnicas. |
-| `docs/MER.md` | Modelo entidad-relación de la base de datos. |
-| `docs/contrato-api.md` | Contratos de los endpoints de la API. |
-| `docs/guia-desarrollo.md` | Guía para organizar y desarrollar el proyecto. |
-| `docs/trazabilidad.md` | Relación entre requisitos, implementación y pruebas. |
+## 1. Descripción del sistema
 
-## 2. Tecnologías
+SoporteTI busca centralizar el proceso de atención de incidentes y solicitudes de soporte tecnológico de una institución.
 
-- **Backend:** Python y FastAPI.
-- **Frontend:** React y TypeScript.
-- **Base de datos:** PostgreSQL mediante Supabase.
-- **ORM:** SQLAlchemy.
-- **Migraciones:** Alembic.
-- **Almacenamiento de archivos:** Supabase Storage.
-- **Procesamiento de imágenes:** Pillow y pillow-heif.
-- **Recepción de archivos:** python-multipart.
-- **Comunicación HTTP:** HTTPX.
-- **Pruebas:** pytest.
+El sistema contempla tres roles:
 
-## 3. Estructura del repositorio
+- **Solicitante:** registra solicitudes, consulta su estado, participa en conversaciones, responde peticiones de información y consulta el resultado de la atención.
+- **Técnico:** consulta sus solicitudes asignadas, registra intervenciones, solicita información adicional y documenta las soluciones.
+- **Coordinador:** administra usuarios y categorías, evalúa solicitudes, asigna técnicos, supervisa la atención, revisa soluciones, cierra solicitudes y consulta estadísticas.
+
+El sistema aplica permisos en el backend para restringir las operaciones según el rol y la relación del usuario con cada solicitud.
+
+## 2. Alcance y requisitos
+
+El proyecto contempla:
+
+- Autenticación y control de acceso por roles.
+- Administración de usuarios y datos de contacto.
+- Registro y consulta de solicitudes.
+- Evaluación, clasificación y asignación de solicitudes.
+- Actualización controlada de estados.
+- Registro y consulta de intervenciones técnicas.
+- Solicitud y respuesta de información adicional.
+- Registro de soluciones y cierre de solicitudes.
+- Conversaciones y mensajes asociados a solicitudes.
+- Adjuntos en solicitudes, mensajes e intervenciones.
+- Notificaciones internas.
+- Historial de cambios.
+- Estadísticas para coordinación.
+
+No se incluyen notificaciones por correo, SMS o WhatsApp, chat mediante WebSockets ni recuperación automática de contraseñas mediante servicios externos.
+
+**Documentación:**
+- [Requisitos funcionales y no funcionales](docs/requisitos.md).
+- [Diseño de la solución](docs/diseno.md).
+- [Contrato de la API](docs/contrato-api.md).
+- [Guía de desarrollo](docs/guia-desarrollo.md).
+- [Matriz de trazabilidad](docs/trazabilidad.md).
+
+## 3. Arquitectura y tecnologías
+
+La solución utiliza una arquitectura cliente-servidor:
+
+| Componente | Tecnología | Responsabilidad |
+|---|---|---|
+| Frontend | React, TypeScript y Vite | Interfaz de usuario y consumo de la API. |
+| Backend | Python y FastAPI | API REST, reglas de negocio y autorización. |
+| Base de datos | PostgreSQL | Persistencia de usuarios, solicitudes y demás registros. |
+| Plataforma de datos | Supabase | Servicio PostgreSQL. |
+| Almacenamiento | Supabase Storage | Almacenamiento privado de archivos. |
+| ORM | SQLAlchemy | Acceso y persistencia de datos. |
+| Migraciones | Alembic | Evolución del esquema de base de datos. |
+| Pruebas | pytest | Validación automatizada del backend. |
+
+### Estructura principal
 
 ```text
 SoporteTI/
@@ -45,75 +78,27 @@ SoporteTI/
 │   │   ├── alembic/
 │   │   ├── tests/
 │   │   ├── .env.example
-│   │   ├── alembic.ini
 │   │   └── requirements.txt
 │   └── frontend/
 ├── docs/
 ├── evidencias/
+├── proyecto2.md
 └── README.md
 ```
 
-## 4. Funcionalidades del sistema
+El código fuente del frontend se encuentra actualmente en las ramas `feature/frontend-base` y `feature/frontend-solicitudes`; su integración en `feature/backend-integrado` está pendiente.
 
-SoporteTI contempla tres roles principales:
+## 4. Configuración del entorno
 
-- **Solicitante:** registra solicitudes, consulta su estado, participa en conversaciones y responde solicitudes de información.
-- **Técnico:** consulta sus solicitudes asignadas, registra intervenciones, diagnósticos y soluciones, y participa en la atención.
-- **Coordinador:** administra y supervisa las solicitudes, gestiona asignaciones, revisa soluciones y realiza cierres.
+### 4.1. Requisitos previos
 
-### 4.1. Gestión y seguimiento de solicitudes
-
-El sistema contempla funcionalidades para:
-
-- Registrar y consultar solicitudes.
-- Clasificar solicitudes y establecer prioridades.
-- Asignar y reasignar técnicos.
-- Controlar las transiciones de estado.
-- Registrar intervenciones técnicas.
-- Diferenciar intervenciones internas de las visibles para el solicitante.
-- Solicitar información adicional y registrar las respuestas.
-- Registrar soluciones.
-- Consultar intervenciones respetando los permisos.
-- Mantener conversaciones y mensajes asociados a las solicitudes.
-- Conservar la trazabilidad de las actividades realizadas.
-
-### 4.2. Adjuntos en intervenciones técnicas (RF-25)
-
-El backend permite que el técnico asignado adjunte imágenes a las intervenciones de una solicitud abierta.
-
-Características:
-
-- Recibe imágenes en formatos compatibles con Pillow y pillow-heif, incluyendo PNG, JPEG y HEIC.
-- Acepta archivos de entrada de hasta 10 MB.
-- Valida el contenido real del archivo.
-- Corrige la orientación de las imágenes cuando contienen información EXIF.
-- Redimensiona las imágenes que superan los 1920 píxeles de ancho o alto, conservando su proporción.
-- Convierte automáticamente las imágenes a WebP con calidad del 80 %.
-- Almacena los archivos convertidos en un bucket privado de Supabase Storage.
-- Registra los metadatos en PostgreSQL, asociados a la solicitud, intervención y técnico.
-- Evita exponer públicamente la ruta interna de almacenamiento.
-- Si falla el registro en la base de datos, intenta eliminar el archivo previamente almacenado para evitar archivos huérfanos.
-
-**Endpoint implementado:**
-
-| Método | Ruta | Descripción |
-|---|---|---|
-| POST | `/api/v1/requests/{solicitud_id}/interventions/{intervencion_id}/attachments` | Adjunta una imagen a una intervención. |
-
-La solicitud utiliza `multipart/form-data` y recibe el archivo mediante el campo `archivo`.
-
-La operación está restringida al técnico asignado y no permite adjuntar imágenes a solicitudes cerradas.
-
-## 5. Configuración del backend
-
-### Requisitos previos
-
-- Python instalado.
 - Git.
+- Python.
+- Node.js y npm para el frontend.
 - Acceso al proyecto de Supabase.
-- Un bucket privado de Supabase Storage llamado `soporteti-adjuntos`.
+- Bucket privado de Supabase Storage llamado `soporteti-adjuntos`.
 
-### 5.1. Ubicarse en el backend
+### 4.2. Configuración del backend
 
 Desde la raíz del repositorio:
 
@@ -121,111 +106,149 @@ Desde la raíz del repositorio:
 cd apps/backend
 ```
 
-### 5.2. Crear el entorno virtual
+Crear el entorno virtual:
 
 ```powershell
 python -m venv .venv
 ```
 
-Activarlo en PowerShell:
+Activarlo:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
 ```
 
-### 5.3. Instalar dependencias
+Instalar dependencias:
 
 ```powershell
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-Entre las dependencias utilizadas se encuentran Pillow, pillow-heif, python-multipart y HTTPX.
-
-### 5.4. Configurar las variables de entorno
-
-Crear el archivo `.env` a partir de `.env.example`:
+Crear el archivo de configuración:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Configurar las variables necesarias:
+Configurar las variables necesarias en `.env`:
 
 ```env
-# Conexión a PostgreSQL de Supabase
 DATABASE_URL=postgresql://...
 
-# Supabase Storage
 SUPABASE_URL=https://TU_PROJECT_REF.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=TU_SERVICE_ROLE_KEY
 SUPABASE_STORAGE_BUCKET=soporteti-adjuntos
 
-# Sesiones
 SESSION_DURATION_HOURS=8
 SESSION_COOKIE_SECURE=false
 SESSION_COOKIE_SAMESITE=lax
 
-# Direcciones permitidas del frontend
 CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
 
-La variable `DATABASE_URL` corresponde a la conexión PostgreSQL. `SUPABASE_URL` corresponde a la URL del proyecto de Supabase y se utiliza para acceder a Storage.
+La variable `DATABASE_URL` corresponde a la conexión PostgreSQL. Las variables `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` se utilizan para acceder al almacenamiento.
 
 **Seguridad:**
+- No subir el archivo `.env` al repositorio.
+- No exponer la clave `SUPABASE_SERVICE_ROLE_KEY` en el frontend.
+- Mantener privado el bucket de adjuntos.
+- Utilizar datos ficticios en las demostraciones.
 
-- La clave `SUPABASE_SERVICE_ROLE_KEY` debe mantenerse exclusivamente en el backend.
-- No se debe exponer esta clave al frontend.
-- El archivo `.env` contiene credenciales y nunca debe subirse al repositorio.
-- El bucket de adjuntos debe permanecer privado.
-
-## 6. Ejecución del backend
+### 4.3. Migraciones de base de datos
 
 Desde `apps/backend`, con el entorno virtual activado:
 
 ```powershell
-uvicorn app.main:app --reload
+alembic upgrade head
 ```
 
-El servidor estará disponible en:
-
-```text
-http://127.0.0.1:8000
-```
-
-### 6.1. Endpoints de verificación
-
-| Método | Endpoint | Descripción |
-|---|---|---|
-| GET | `/` | Información básica de la API. |
-| GET | `/api/v1/health` | Comprueba que la API esté funcionando. |
-| GET | `/api/v1/health/db` | Comprueba la conexión con PostgreSQL. |
-
-### 6.2. Documentación interactiva
-
-FastAPI genera automáticamente la documentación de los endpoints mediante Swagger UI:
-
-```text
-http://127.0.0.1:8000/docs
-```
-
-## 7. Base de datos
-
-La base de datos utiliza PostgreSQL mediante Supabase.
-
-El esquema se encuentra definido mediante migraciones de Alembic en:
+Las migraciones se encuentran en:
 
 ```text
 apps/backend/alembic/versions/
 ```
 
-Las migraciones establecen las tablas, relaciones y restricciones de integridad del sistema.
+### 4.4. Ejecutar el backend
 
-Para los adjuntos, la tabla `adjuntos` conserva los metadatos y la ruta interna de Storage. El contenido binario de las imágenes se almacena en Supabase Storage.
+```powershell
+uvicorn app.main:app --reload
+```
 
-Cualquier modificación posterior del esquema debe gestionarse mediante nuevas migraciones, evitando alterar migraciones que ya hayan sido aplicadas.
+La API estará disponible en:
 
-## 8. Ejecución de pruebas
+```text
+http://127.0.0.1:8000
+```
+
+La documentación interactiva estará disponible en:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+## 5. Servicios web implementados
+
+La API utiliza el prefijo `/api/v1`.
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/api/v1/login` | Inicio de sesión. |
+| POST | `/api/v1/logout` | Cierre de sesión. |
+| GET | `/api/v1/me` | Consulta del usuario autenticado. |
+| POST | `/api/v1/change-password` | Cambio de contraseña. |
+| GET | `/api/v1/users` | Consulta de usuarios. |
+| POST | `/api/v1/users` | Creación de usuarios. |
+| PATCH | `/api/v1/users/{id}` | Actualización de usuarios. |
+| GET | `/api/v1/categories` | Consulta de categorías. |
+| GET | `/api/v1/requests` | Consulta de solicitudes. |
+| POST | `/api/v1/requests` | Creación de solicitudes. |
+| GET | `/api/v1/requests/{id}` | Consulta del detalle de una solicitud. |
+| PATCH | `/api/v1/requests/{id}/status` | Actualización del estado. |
+| POST | `/api/v1/requests/{id}/assignments` | Asignación o reasignación de técnicos. |
+| GET | `/api/v1/requests/{id}/assignments` | Consulta de asignaciones. |
+| POST | `/api/v1/requests/{id}/cancel` | Cancelación de una solicitud. |
+| POST | `/api/v1/requests/{id}/close` | Cierre de una solicitud. |
+| POST | `/api/v1/requests/{id}/resolve` | Registro de una solución. |
+| GET | `/api/v1/requests/{id}/interventions` | Consulta de intervenciones. |
+| POST | `/api/v1/requests/{id}/messages` | Envío de mensajes. |
+| GET | `/api/v1/requests/{id}/messages` | Consulta de mensajes. |
+| POST | `/api/v1/requests/{id}/messages/{message_id}/attachments` | Adjuntos en mensajes. |
+| GET | `/api/v1/requests/{id}/messages/{message_id}/attachments` | Consulta de adjuntos de mensajes. |
+| POST | `/api/v1/requests/{id}/interventions/{intervention_id}/attachments` | Adjuntos en intervenciones. |
+| GET | `/api/v1/requests/{id}/attachments` | Consulta de adjuntos de solicitudes. |
+| GET | `/api/v1/attachments/{id}/download` | Descarga de adjuntos. |
+| GET | `/api/v1/requests/{id}/history` | Consulta del historial de cambios. |
+| GET | `/api/v1/notifications` | Consulta de notificaciones internas. |
+| PATCH | `/api/v1/notifications/read-all` | Marcar notificaciones como leídas. |
+| PATCH | `/api/v1/notifications/{id}/read` | Marcar una notificación como leída. |
+| GET | `/api/v1/statistics` | Consulta de estadísticas. |
+| GET | `/api/v1/health` | Verificación del backend. |
+| GET | `/api/v1/health/db` | Verificación de conexión con la base de datos. |
+
+Los permisos de cada operación dependen del rol autenticado y de las reglas definidas para cada solicitud.
+
+La especificación completa de parámetros, cuerpos de petición, respuestas y errores se encuentra en [docs/contrato-api.md](docs/contrato-api.md).
+
+## 6. Archivos adjuntos
+
+Los adjuntos se procesan desde el backend y se almacenan en Supabase Storage.
+
+El servicio de procesamiento de imágenes contempla:
+
+- Validación del contenido real del archivo.
+- Conversión a formato WebP.
+- Corrección de orientación cuando existe información EXIF.
+- Redimensionamiento de imágenes cuando es necesario.
+- Almacenamiento privado.
+- Registro de metadatos en PostgreSQL.
+- Validación de permisos y estado de la solicitud.
+
+Los adjuntos están asociados a solicitudes, mensajes o intervenciones, según la operación utilizada.
+
+## 7. Pruebas y evidencias
+
+### 7.1. Pruebas automatizadas del backend
 
 Desde `apps/backend`, con el entorno virtual activado:
 
@@ -235,45 +258,66 @@ Ejecutar todas las pruebas:
 python -m pytest -q
 ```
 
-Ejecutar las pruebas específicas de adjuntos en intervenciones:
+Ejecutar las pruebas de un requisito específico:
 
 ```powershell
-python -m pytest tests/test_rf25_adjuntos_intervenciones.py -v
+python -m pytest tests/test_rf24_adjuntos_mensajes.py -v
 ```
 
-Las pruebas de RF-25 verifican:
+Los archivos de pruebas se encuentran en:
 
-- Conversión de PNG y JPEG a WebP.
-- Redimensionamiento conservando las proporciones.
-- Rechazo de archivos inválidos y vacíos.
-- Rechazo de archivos superiores a 10 MB.
-- Carga de imágenes por parte del técnico asignado.
-- Registro de metadatos en PostgreSQL.
-- Restricción de acceso para técnicos no asignados.
-- Rechazo de adjuntos en solicitudes cerradas.
-- Rechazo de archivos que no son imágenes.
-- Restricción de acceso para solicitantes y coordinadores.
+```text
+apps/backend/tests/
+```
 
-Las pruebas de almacenamiento externo utilizan simulaciones para no depender de una conexión real con Supabase durante su ejecución.
+Las pruebas cubren autenticación, permisos, usuarios, solicitudes, asignaciones, intervenciones, mensajes, adjuntos, notificaciones, historial y estadísticas.
 
-## 9. Organización del desarrollo
+### 7.2. Pruebas funcionales del proyecto
 
-El proyecto se desarrolla mediante módulos funcionales correspondientes a los roles de solicitante, técnico y coordinador.
+La guía del proyecto exige documentar 12 pruebas funcionales reproducibles, incluyendo casos exitosos, entradas inválidas, permisos, persistencia, integridad e integración entre interfaz, API y base de datos.
 
-Los cambios deben respetar:
+**Documento pendiente de consolidación:** `docs/pruebas.md`.
 
-- Los requisitos funcionales aprobados.
-- El modelo entidad-relación.
-- Los contratos de la API.
-- Las reglas de autorización por roles.
-- Las restricciones de integridad de la base de datos.
+Las evidencias de ejecución deberán conservarse en la carpeta `evidencias/`.
 
-Cada requisito funcional se desarrolla en una rama independiente y se integra mediante Pull Requests, siguiendo la organización establecida para el equipo.
+### 7.3. Matriz de trazabilidad
 
-## 10. Estado del proyecto
+La relación entre condiciones de aceptación, requisitos, implementación, Pull Requests y pruebas se documenta en:
 
-El desarrollo se realiza progresivamente por requisitos funcionales.
+[docs/trazabilidad.md](docs/trazabilidad.md).
 
-Los avances de cada requisito, sus archivos de implementación y las pruebas correspondientes se documentan en `docs/trazabilidad.md`.
+## 8. Organización del desarrollo
 
-Para considerar un requisito completado se debe contar con implementación, validación mediante pruebas y la documentación correspondiente.
+El desarrollo se organiza por módulos y requisitos funcionales.
+
+- **Integrante 1:** módulo coordinador y backend del solicitante.
+- **Integrante 2:** módulo técnico y frontend del solicitante.
+- **Trabajo compartido:** autenticación, sesiones, modelo de datos, contrato de API, conversaciones e integración.
+
+Cada requisito funcional se desarrolla en una rama independiente y se integra mediante Pull Requests.
+
+Los cambios deben respetar los requisitos, el diseño, el modelo de datos y el contrato de la API.
+
+## 9. Estado y limitaciones
+
+El backend integrado contiene módulos para los requisitos funcionales RF-01 a RF-29, incluyendo autenticación, usuarios, solicitudes, atención técnica, conversaciones, adjuntos, notificaciones, historial y estadísticas.
+
+Para considerar el proyecto completo todavía se debe:
+
+- Integrar el código fuente del frontend con la rama del backend.
+- Consolidar las 12 pruebas funcionales documentadas y sus evidencias.
+- Actualizar la matriz de trazabilidad con las implementaciones y pruebas reales.
+- Armonizar las restricciones documentadas de los adjuntos con la implementación.
+- Verificar el flujo completo desde la interfaz hasta la persistencia.
+
+El alcance no contempla notificaciones externas por correo, SMS o WhatsApp, ni comunicación en tiempo real mediante WebSockets.
+
+## 10. Documentación complementaria
+
+- [Guía principal del proyecto](proyecto2.md).
+- [Requisitos](docs/requisitos.md).
+- [Diseño](docs/diseno.md).
+- [Modelo entidad-relación](docs/MER.md).
+- [Contrato de API](docs/contrato-api.md).
+- [Guía de desarrollo](docs/guia-desarrollo.md).
+- [Trazabilidad](docs/trazabilidad.md).
