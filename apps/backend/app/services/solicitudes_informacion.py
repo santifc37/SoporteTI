@@ -27,8 +27,8 @@ def _obtener_solicitud(
     if solicitud is None:
         raise ApiError(
             404,
-            "SOLICITUD_NO_ENCONTRADA",
-            "La solicitud indicada no existe.",
+            "RECURSO_NO_ENCONTRADO",
+            "La solicitud indicada no existe o no es accesible.",
         )
 
     return solicitud
@@ -63,7 +63,7 @@ def _verificar_acceso(
 
     raise ApiError(
         403,
-        "SIN_PERMISO",
+        "PERMISO_DENEGADO",
         "No tienes permiso para consultar esta información.",
     )
 
@@ -86,8 +86,8 @@ def crear_solicitud_informacion(
     if solicitud is None:
         raise ApiError(
             404,
-            "SOLICITUD_NO_ENCONTRADA",
-            "La solicitud indicada no existe.",
+            "RECURSO_NO_ENCONTRADO",
+            "La solicitud indicada no existe o no es accesible.",
         )
 
     if rol == "tecnico":
@@ -102,14 +102,14 @@ def crear_solicitud_informacion(
         if asignacion is None:
             raise ApiError(
                 403,
-                "SIN_PERMISO",
+                "PERMISO_DENEGADO",
                 "No tienes una asignación activa para esta solicitud.",
             )
 
     elif rol != "coordinador":
         raise ApiError(
             403,
-            "SIN_PERMISO",
+            "PERMISO_DENEGADO",
             "No tienes permiso para solicitar información adicional.",
         )
 
@@ -170,8 +170,7 @@ def consultar_solicitudes_informacion(
     for peticion, autor in resultados:
         respuesta = db.scalar(
             select(RespuestaInformacion).where(
-                RespuestaInformacion.solicitud_informacion_id
-                == peticion.id
+                RespuestaInformacion.solicitud_informacion_id == peticion.id
             )
         )
 
@@ -219,8 +218,8 @@ def responder_solicitud_informacion(
     if peticion is None:
         raise ApiError(
             404,
-            "PETICION_NO_ENCONTRADA",
-            "La petición de información indicada no existe.",
+            "RECURSO_NO_ENCONTRADO",
+            "La petición de información indicada no existe o no es accesible.",
         )
 
     solicitud = _obtener_solicitud(db, peticion.solicitud_id)
@@ -228,7 +227,7 @@ def responder_solicitud_informacion(
     if solicitud.solicitante_id != solicitante_id:
         raise ApiError(
             403,
-            "SIN_PERMISO",
+            "PERMISO_DENEGADO",
             "No puedes responder peticiones de otra solicitud.",
         )
 

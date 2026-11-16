@@ -10,6 +10,7 @@ from app.models.solicitud_informacion import SolicitudInformacion
 from app.models.respuesta_informacion import RespuestaInformacion
 from app.models.mensaje import Mensaje
 from app.models.adjunto import Adjunto
+from app.models.notificacion import Notificacion
 
 __all__ = [
     "Adjunto",
@@ -19,6 +20,7 @@ __all__ = [
     "HistorialCambio",
     "Intervencion",
     "Mensaje",
+    "Notificacion",
     "RespuestaInformacion",
     "Sesion",
     "Solicitud",

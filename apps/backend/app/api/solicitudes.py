@@ -2,42 +2,26 @@
 import uuid
 from datetime import datetime
 from urllib.parse import quote
+
 from fastapi import APIRouter, Depends, File, Query, UploadFile
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
-from app.services.adjuntos import registrar_adjunto, ErrorStorage
-
-
-from fastapi.responses import Response
-
-from app.services.adjuntos_solicitudes import (
-    registrar_adjunto_solicitud,
-    consultar_adjuntos_solicitud,
-    descargar_adjunto,
-)
-
+from app.api.dependencies import UsuarioActual, get_current_user
+from app.api.permisos import requiere_rol
+from app.core.errors import ApiError
+from app.database.session import get_db
 
 from app.schemas.solucion import RegistrarSolucion
 from app.schemas.solicitud_informacion import (
     CrearSolicitudInformacion,
     SolicitudInformacionRespuesta,
 )
-from app.schemas.respuesta_informacion import (
-    CrearRespuestaInformacion,
-    RespuestaInformacionRespuesta,
+from app.schemas.intervencion import (
+    CrearIntervencion,
+    IntervencionRespuesta,
+    IntervencionesRespuesta,
 )
-from app.services.solicitudes_informacion import (
-    crear_solicitud_informacion,
-    consultar_solicitudes_informacion,
-    responder_solicitud_informacion,
-)
-
-from app.schemas.intervencion import CrearIntervencion, IntervencionRespuesta,IntervencionesRespuesta
-from app.services.intervenciones import registrar_intervencion,consultar_intervenciones
-
-from app.api.dependencies import UsuarioActual, get_current_user
-from app.core.errors import ApiError
-from app.database.session import get_db
 from app.schemas.solicitud import (
     ActualizarEstadoSolicitud,
     EstadoSolicitud,
@@ -45,6 +29,24 @@ from app.schemas.solicitud import (
     SolicitudesPagina,
     TipoCierre,
     TipoSolicitud,
+    CrearSolicitud,
+    SolicitudCreada,
+    SolicitudCreadaMensaje,
+    SolicitudDetalle,
+    ClasificarSolicitud,
+    SolicitudClasificada,
+    SolicitudClasificadaMensaje,
+)
+
+from app.services.adjuntos import registrar_adjunto, ErrorStorage
+from app.services.adjuntos_solicitudes import (
+    registrar_adjunto_solicitud,
+    consultar_adjuntos_solicitud,
+    descargar_adjunto,
+)
+from app.services.intervenciones import (
+    registrar_intervencion,
+    consultar_intervenciones,
 )
 from app.services.solicitudes import (
     FiltrosSolicitudes,
@@ -52,9 +54,18 @@ from app.services.solicitudes import (
     listar_solicitudes,
     listar_solicitudes_asignadas,
     registrar_solucion,
+    crear_solicitud,
+    obtener_solicitud_detalle,
+    clasificar_solicitud,
+    iniciar_evaluacion,
 )
+from app.services.solicitudes_informacion import crear_solicitud_informacion
+
 
 router = APIRouter(tags=["Solicitudes"])
+
+
+# ------------------------------ RF-07 / RF-13: consultar solicitudes ------------------------------
 
 
 @router.get("/requests", response_model=SolicitudesPagina)
@@ -112,7 +123,6 @@ def consultar_solicitudes(
         )
 
     if usuario.rol == "solicitante":
-        # Aunque envíe solicitante_id, solo ve las suyas.
         return listar_solicitudes(
             db, filtros, page, limit, solicitante_id=usuario.id
         )
@@ -129,8 +139,13 @@ def consultar_solicitudes(
         )
 
     raise ApiError(
-        403, "PERMISO_DENEGADO", "No tienes permisos para realizar esta operación."
+        403,
+        "PERMISO_DENEGADO",
+        "No tienes permisos para realizar esta operación.",
     )
+
+
+# ------------------------------ RF-14: actualizar estado ------------------------------
 
 
 @router.patch("/requests/{solicitud_id}/status")
@@ -140,11 +155,7 @@ def cambiar_estado_solicitud(
     db: Session = Depends(get_db),
     usuario: UsuarioActual = Depends(get_current_user),
 ):
-    """RF-14: cambio de estado según el rol.
-
-    - Técnico asignado: asignado → en_atencion, en_atencion ↔ en_espera.
-    - Coordinador (RF-09): registrado → en_evaluacion.
-    """
+    """RF-14: cambio de estado según el rol."""
 
     if usuario.rol == "coordinador":
         solicitud, estado_anterior = iniciar_evaluacion(
@@ -177,6 +188,10 @@ def cambiar_estado_solicitud(
         },
     }
 
+
+# ------------------------------ RF-16: intervenciones ------------------------------
+
+
 @router.post(
     "/requests/{solicitud_id}/interventions",
     response_model=IntervencionRespuesta,
@@ -203,6 +218,9 @@ def crear_intervencion(
     )
 
 
+# ------------------------------ RF-21: consultar intervenciones ------------------------------
+
+
 @router.get(
     "/requests/{solicitud_id}/interventions",
     response_model=IntervencionesRespuesta,
@@ -222,8 +240,8 @@ def obtener_intervenciones(
     return {"data": intervenciones}
 
 
+# ------------------------------ RF-18: solicitar información ------------------------------
 
-# ------------------------- RF-18: información adicional -------------------------
 
 @router.post(
     "/requests/{solicitud_id}/information-requests",
@@ -253,57 +271,7 @@ def crear_peticion_informacion(
     }
 
 
-@router.get(
-    "/requests/{solicitud_id}/information-requests",
-)
-def obtener_peticiones_informacion(
-    solicitud_id: uuid.UUID,
-    db: Session = Depends(get_db),
-    usuario: UsuarioActual = Depends(get_current_user),
-):
-    """RF-18: consulta las peticiones y sus respuestas."""
-
-    peticiones = consultar_solicitudes_informacion(
-        db=db,
-        solicitud_id=solicitud_id,
-        usuario_id=usuario.id,
-        rol=usuario.rol,
-    )
-
-    return {"data": peticiones}
-
-
-@router.post(
-    "/information-requests/{solicitud_informacion_id}/responses",
-    status_code=201,
-)
-def responder_peticion_informacion(
-    solicitud_informacion_id: uuid.UUID,
-    datos: CrearRespuestaInformacion,
-    db: Session = Depends(get_db),
-    usuario: UsuarioActual = Depends(get_current_user),
-):
-    """RF-18: el solicitante propietario responde una petición."""
-
-    if usuario.rol != "solicitante":
-        raise ApiError(
-            403,
-            "SIN_PERMISO",
-            "Solo el solicitante puede responder esta petición.",
-        )
-
-    respuesta = responder_solicitud_informacion(
-        db=db,
-        solicitud_informacion_id=solicitud_informacion_id,
-        solicitante_id=usuario.id,
-        datos=datos,
-    )
-
-    return {
-        "mensaje": "Respuesta registrada correctamente",
-        "respuesta": RespuestaInformacionRespuesta.model_validate(respuesta),
-    }
-
+# ------------------------------ RF-19: registrar solución ------------------------------
 
 
 @router.post("/requests/{solicitud_id}/resolve")
@@ -341,6 +309,9 @@ def resolver_solicitud(
             "fecha_actualizacion": solicitud.fecha_actualizacion,
         },
     }
+
+
+# ------------------------------ RF-25: adjuntos de intervenciones ------------------------------
 
 
 @router.post(
@@ -393,14 +364,6 @@ def adjuntar_imagen_intervencion(
 
 # ------------------------------ RF-06: crear solicitud ------------------------------
 
-from app.api.permisos import requiere_rol
-from app.schemas.solicitud import (
-    CrearSolicitud,
-    SolicitudCreada,
-    SolicitudCreadaMensaje,
-)
-from app.services.solicitudes import crear_solicitud
-
 
 @router.post(
     "/requests",
@@ -414,7 +377,11 @@ def registrar_solicitud(
 ):
     """RF-06: el solicitante registra una solicitud de soporte."""
 
-    solicitud = crear_solicitud(db=db, solicitante_id=usuario.id, datos=datos)
+    solicitud = crear_solicitud(
+        db=db,
+        solicitante_id=usuario.id,
+        datos=datos,
+    )
 
     return SolicitudCreadaMensaje(
         mensaje="Solicitud creada correctamente",
@@ -422,10 +389,7 @@ def registrar_solicitud(
     )
 
 
-# --------------------------- RF-07: detalle de una solicitud ---------------------------
-
-from app.schemas.solicitud import SolicitudDetalle
-from app.services.solicitudes import obtener_solicitud_detalle
+# ------------------------------ RF-07: detalle de solicitud ------------------------------
 
 
 @router.get("/requests/{solicitud_id}", response_model=SolicitudDetalle)
@@ -434,39 +398,36 @@ def detalle_solicitud(
     db: Session = Depends(get_db),
     usuario: UsuarioActual = Depends(get_current_user),
 ):
-    """RF-07: detalle de una solicitud (contrato-api.md §7.3).
-
-    Pueden consultarla el solicitante propietario, el técnico asignado
-    actualmente y el coordinador.
-    """
+    """RF-07: detalle de una solicitud."""
 
     return obtener_solicitud_detalle(
-        db=db, solicitud_id=solicitud_id, usuario_id=usuario.id, rol=usuario.rol
+        db=db,
+        solicitud_id=solicitud_id,
+        usuario_id=usuario.id,
+        rol=usuario.rol,
     )
 
 
+# ------------------------------ RF-09 / RF-10: evaluación y clasificación ------------------------------
 
-# ------------------- RF-09 / RF-10: evaluación y clasificación -------------------
 
-from app.schemas.solicitud import (
-    ClasificarSolicitud,
-    SolicitudClasificada,
-    SolicitudClasificadaMensaje,
+@router.patch(
+    "/requests/{solicitud_id}",
+    response_model=SolicitudClasificadaMensaje,
 )
-from app.services.solicitudes import clasificar_solicitud, iniciar_evaluacion
-
-
-@router.patch("/requests/{solicitud_id}", response_model=SolicitudClasificadaMensaje)
 def clasificar(
     solicitud_id: uuid.UUID,
     datos: ClasificarSolicitud,
     db: Session = Depends(get_db),
     usuario: UsuarioActual = Depends(requiere_rol("coordinador")),
 ):
-    """RF-10: el coordinador establece la categoría y la prioridad (contrato §7.4)."""
+    """RF-10: el coordinador establece la categoría y la prioridad."""
 
     solicitud = clasificar_solicitud(
-        db=db, solicitud_id=solicitud_id, coordinador_id=usuario.id, datos=datos
+        db=db,
+        solicitud_id=solicitud_id,
+        coordinador_id=usuario.id,
+        datos=datos,
     )
 
     return SolicitudClasificadaMensaje(
@@ -479,7 +440,6 @@ def clasificar(
             estado=solicitud.estado,
         ),
     )
-
 
 
 # ------------------------------ RF-08: adjuntos en solicitudes ------------------------------

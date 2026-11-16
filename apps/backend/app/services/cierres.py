@@ -15,12 +15,14 @@ su historial (requisitos.md §8.2).
 import uuid
 from datetime import datetime, timezone
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import ApiError
-from app.models import Solicitud
+from app.models import Asignacion, Solicitud
 from app.models.historial_cambio import HistorialCambio
 from app.schemas.cierre import CancelarSolicitud, CerrarSolicitud
+from app.services.notificaciones import notificar, referencia
 from app.services.solicitudes import _solicitud_para_modificar
 
 # Estado desde el que se permite cada tipo de cierre del coordinador.
@@ -86,6 +88,28 @@ def _cerrar(
         raise
 
 
+def _notificar_cierre(db: Session, solicitud: Solicitud, tipo_cierre: str) -> None:
+    """Avisa del cierre al solicitante y al técnico asignado, si lo hay."""
+    detalle = {
+        "solucion": "fue cerrada como solucionada",
+        "administrativo": "fue cerrada administrativamente",
+    }[tipo_cierre]
+    ref = referencia(solicitud)
+
+    notificar(
+        db, solicitud.solicitante_id, solicitud, "solicitud_cerrada", f"Tu solicitud {ref} {detalle}."
+    )
+
+    tecnico_id = db.scalar(
+        select(Asignacion.tecnico_id).where(
+            Asignacion.solicitud_id == solicitud.id,
+            Asignacion.fecha_finalizacion.is_(None),
+        )
+    )
+    if tecnico_id is not None:
+        notificar(db, tecnico_id, solicitud, "solicitud_cerrada", f"La solicitud {ref} {detalle}.")
+
+
 def cerrar_solicitud(
     db: Session,
     solicitud_id: uuid.UUID,
@@ -104,6 +128,9 @@ def cerrar_solicitud(
             "administrativo": "El cierre administrativo solo se permite durante la evaluación.",
         }
         raise ApiError(409, "ESTADO_NO_PERMITIDO", mensajes[datos.tipo_cierre])
+
+    # RF-27: se confirman junto con el cierre (el commit lo hace _cerrar).
+    _notificar_cierre(db, solicitud, datos.tipo_cierre)
 
     estado_anterior = _cerrar(
         db, solicitud, coordinador_id, datos.tipo_cierre, datos.motivo_cierre
