@@ -1,58 +1,0 @@
-apps/backend/app/models/__init__.py:1: trailing whitespace.
-[32m+[m[32mfrom app.models.asignacion import Asignacion[m[41m[m
-apps/backend/app/models/__init__.py:2: trailing whitespace.
-[32m+[m[32mfrom app.models.base import Base[m[41m[m
-apps/backend/app/models/__init__.py:3: trailing whitespace.
-[32m+[m[32mfrom app.models.categoria import Categoria[m[41m[m
-apps/backend/app/models/__init__.py:4: trailing whitespace.
-[32m+[m[32mfrom app.models.sesion import Sesion[m[41m[m
-apps/backend/app/models/__init__.py:5: trailing whitespace.
-[32m+[m[32mfrom app.models.solicitud import Solicitud[m[41m[m
-apps/backend/app/models/__init__.py:6: trailing whitespace.
-[32m+[m[32mfrom app.models.usuario import Usuario[m[41m[m
-apps/backend/app/models/__init__.py:7: trailing whitespace.
-[32m+[m[32mfrom app.models.historial_cambio import HistorialCambio[m[41m[m
-apps/backend/app/models/__init__.py:8: trailing whitespace.
-[32m+[m[32mfrom app.models.intervencion import Intervencion[m[41m[m
-apps/backend/app/models/__init__.py:9: trailing whitespace.
-[32m+[m[32mfrom app.models.solicitud_informacion import SolicitudInformacion[m[41m[m
-apps/backend/app/models/__init__.py:10: trailing whitespace.
-[32m+[m[32mfrom app.models.respuesta_informacion import RespuestaInformacion[m[41m[m
-apps/backend/app/models/__init__.py:11: trailing whitespace.
-[32m+[m[32mfrom app.models.mensaje import Mensaje[m[41m[m
-apps/backend/app/models/__init__.py:12: trailing whitespace.
-[32m+[m[32mfrom app.models.adjunto import Adjunto[m[41m[m
-apps/backend/app/models/__init__.py:13: trailing whitespace.
-[32m+[m[32mfrom app.models.notificacion import Notificacion[m[41m[m
-apps/backend/app/models/__init__.py:14: trailing whitespace.
-[32m+[m[41m[m
-apps/backend/app/models/__init__.py:15: trailing whitespace.
-[32m+[m[32m__all__ = [[m[41m[m
-apps/backend/app/models/__init__.py:16: trailing whitespace.
-[32m+[m[32m    "Adjunto",[m[41m[m
-apps/backend/app/models/__init__.py:17: trailing whitespace.
-[32m+[m[32m    "Asignacion",[m[41m[m
-apps/backend/app/models/__init__.py:18: trailing whitespace.
-[32m+[m[32m    "Base",[m[41m[m
-apps/backend/app/models/__init__.py:19: trailing whitespace.
-[32m+[m[32m    "Categoria",[m[41m[m
-apps/backend/app/models/__init__.py:20: trailing whitespace.
-[32m+[m[32m    "HistorialCambio",[m[41m[m
-apps/backend/app/models/__init__.py:21: trailing whitespace.
-[32m+[m[32m    "Intervencion",[m[41m[m
-apps/backend/app/models/__init__.py:22: trailing whitespace.
-[32m+[m[32m    "Mensaje",[m[41m[m
-apps/backend/app/models/__init__.py:23: trailing whitespace.
-[32m+[m[32m    "Notificacion",[m[41m[m
-apps/backend/app/models/__init__.py:24: trailing whitespace.
-[32m+[m[32m    "RespuestaInformacion",[m[41m[m
-apps/backend/app/models/__init__.py:25: trailing whitespace.
-[32m+[m[32m    "Sesion",[m[41m[m
-apps/backend/app/models/__init__.py:26: trailing whitespace.
-[32m+[m[32m    "Solicitud",[m[41m[m
-apps/backend/app/models/__init__.py:27: trailing whitespace.
-[32m+[m[32m    "SolicitudInformacion",[m[41m[m
-apps/backend/app/models/__init__.py:28: trailing whitespace.
-[32m+[m[32m    "Usuario",[m[41m[m
-apps/backend/app/models/__init__.py:29: trailing whitespace.
-[32m+[m[32m][m[41m[m
