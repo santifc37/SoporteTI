@@ -372,10 +372,10 @@ def test_mensaje_de_otra_solicitud_no_se_puede_usar(
     assert respuesta.status_code == 404
 
 
-
 def test_consultar_adjuntos_del_mensaje(
     client, escenario, monkeypatch
 ):
+    from app.api import mensajes
     from app.services import adjuntos_mensajes
 
     monkeypatch.setattr(
@@ -384,11 +384,10 @@ def test_consultar_adjuntos_del_mensaje(
         lambda ruta, contenido: None,
     )
 
-    # Simula la URL firmada porque la subida también está simulada.
-    from app.services import adjuntos
-
+    # La ruta importa crear_url_firmada directamente desde app.api.mensajes.
+    # Se simula la URL porque la subida a Storage también está simulada.
     monkeypatch.setattr(
-        adjuntos,
+        mensajes,
         "crear_url_firmada",
         lambda ruta: f"https://storage.test/{ruta}",
     )
@@ -406,27 +405,8 @@ def test_consultar_adjuntos_del_mensaje(
     assert respuesta.json()["data"][0]["mensaje_id"] == str(
         escenario["mensaje"].id
     )
-
-    from app.services import adjuntos_mensajes
-
-    monkeypatch.setattr(
-        adjuntos_mensajes,
-        "subir_a_storage",
-        lambda ruta, contenido: None,
-    )
-
-    como(escenario["solicitante"])
-    assert subir(client, escenario).status_code == 201
-
-    respuesta = client.get(
-        f"{URL}/{escenario['solicitud'].id}/messages/"
-        f"{escenario['mensaje'].id}/attachments"
-    )
-
-    assert respuesta.status_code == 200
-    assert len(respuesta.json()["data"]) == 1
-    assert respuesta.json()["data"][0]["mensaje_id"] == str(
-        escenario["mensaje"].id
+    assert respuesta.json()["data"][0]["url"].startswith(
+        "https://storage.test/"
     )
 
 
