@@ -80,7 +80,7 @@ export function ConversacionSolicitud({
   const archivoRef = useRef<HTMLInputElement>(null)
 
   const cerrada = solicitud.estado === 'cerrado'
-  const vistaPrevia = archivo ? URL.createObjectURL(archivo) : null
+  const [vistaPrevia, setVistaPrevia] = useState<string | null>(null)
 
   async function cargarMensajes() {
     try {
@@ -142,9 +142,13 @@ export function ConversacionSolicitud({
   }, [mensajes])
 
   useEffect(() => {
-    if (!archivo) return
+    if (!archivo) {
+      setVistaPrevia(null)
+      return
+    }
 
     const url = URL.createObjectURL(archivo)
+    setVistaPrevia(url)
 
     return () => URL.revokeObjectURL(url)
   }, [archivo])
@@ -429,20 +433,37 @@ export function ConversacionSolicitud({
                     </p>
 
                     {mensaje.adjuntos && mensaje.adjuntos.length > 0 && (
-                      <div className="mt-3 space-y-2">
+                      <div className="mt-3 space-y-3">
                         {mensaje.adjuntos.map((adjunto) => (
-                          <div
-                            key={adjunto.id}
-                            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs ${
-                              propio
-                                ? 'bg-blue-700/70 text-white'
-                                : 'bg-slate-100 text-slate-700'
-                            }`}
-                          >
-                            <span className="text-lg">🖼</span>
-                            <span className="min-w-0 break-all">
+                          <div key={adjunto.id}>
+                            {adjunto.url ? (
+                              <a
+                                href={adjunto.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title="Abrir imagen en otra pestaña"
+                                className="block overflow-hidden rounded-xl"
+                              >
+                                <img
+                                  src={adjunto.url}
+                                  alt={adjunto.nombre_archivo}
+                                  loading="lazy"
+                                  className="max-h-80 w-full rounded-xl object-contain transition hover:opacity-90"
+                                />
+                              </a>
+                            ) : (
+                              <p className="text-xs">
+                                No se pudo cargar la imagen: {adjunto.nombre_archivo}
+                              </p>
+                            )}
+
+                            <p
+                              className={`mt-1 break-all text-xs ${
+                                propio ? 'text-blue-100' : 'text-slate-500'
+                              }`}
+                            >
                               {adjunto.nombre_archivo}
-                            </span>
+                            </p>
                           </div>
                         ))}
                       </div>

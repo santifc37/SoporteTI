@@ -9,6 +9,7 @@ export interface AdjuntoMensaje {
   tamano: number
   subido_por: string
   fecha_subida: string
+  url: string
 }
 
 interface AdjuntosMensajeResponse {
