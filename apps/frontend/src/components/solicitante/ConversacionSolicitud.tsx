@@ -4,6 +4,11 @@ import type { FormEvent } from 'react'
 
 import { useAuth } from '../../hooks/useAuth'
 import { api } from '../../services/api'
+import {
+  consultarAdjuntosMensaje,
+  subirAdjuntoMensaje,
+} from '../../services/mensajes'
+import type { AdjuntoMensaje } from '../../services/mensajes'
 import type { SolicitudResumen } from '../../types/solicitud'
 
 interface MensajeConversacion {
@@ -17,6 +22,7 @@ interface MensajeConversacion {
   contenido: string
   fecha_envio: string
   estado_envio?: 'enviando' | 'enviado' | 'error'
+  adjuntos?: AdjuntoMensaje[]
 }
 
 interface MensajesPagina {
@@ -26,6 +32,17 @@ interface MensajesPagina {
     limit: number
     total: number
     total_pages: number
+  }
+}
+
+interface MensajeEnviadoRespuesta {
+  mensaje: string
+  data: {
+    id: string
+    solicitud_id: string
+    remitente_id: string
+    contenido: string
+    fecha_envio: string
   }
 }
 
@@ -53,14 +70,17 @@ export function ConversacionSolicitud({
 
   const [mensajes, setMensajes] = useState<MensajeConversacion[]>([])
   const [texto, setTexto] = useState('')
+  const [archivo, setArchivo] = useState<File | null>(null)
   const [cargando, setCargando] = useState(true)
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState('')
 
   const historialRef = useRef<HTMLDivElement>(null)
   const campoRef = useRef<HTMLTextAreaElement>(null)
+  const archivoRef = useRef<HTMLInputElement>(null)
 
   const cerrada = solicitud.estado === 'cerrado'
+  const vistaPrevia = archivo ? URL.createObjectURL(archivo) : null
 
   async function cargarMensajes() {
     try {
@@ -68,13 +88,30 @@ export function ConversacionSolicitud({
         `/requests/${solicitud.id}/messages?page=1&limit=100`,
       )
 
-      setMensajes(
-        respuesta.data.map((mensaje) => ({
-          ...mensaje,
-          estado_envio: 'enviado',
-        })),
+      const mensajesConAdjuntos = await Promise.all(
+        respuesta.data.map(async (mensaje) => {
+          try {
+            const adjuntos = await consultarAdjuntosMensaje(
+              solicitud.id,
+              mensaje.id,
+            )
+
+            return {
+              ...mensaje,
+              estado_envio: 'enviado' as const,
+              adjuntos,
+            }
+          } catch {
+            return {
+              ...mensaje,
+              estado_envio: 'enviado' as const,
+              adjuntos: [],
+            }
+          }
+        }),
       )
 
+      setMensajes(mensajesConAdjuntos)
       setError('')
     } catch (err) {
       setError(
@@ -104,13 +141,54 @@ export function ConversacionSolicitud({
     })
   }, [mensajes])
 
+  useEffect(() => {
+    if (!archivo) return
+
+    const url = URL.createObjectURL(archivo)
+
+    return () => URL.revokeObjectURL(url)
+  }, [archivo])
+
+  function seleccionarArchivo(nuevoArchivo: File | undefined) {
+    if (!nuevoArchivo) return
+
+    if (!nuevoArchivo.type.startsWith('image/')) {
+      setError('Solo puedes adjuntar imágenes.')
+      return
+    }
+
+    if (nuevoArchivo.size > 10 * 1024 * 1024) {
+      setError('La imagen no puede superar los 10 MB.')
+      return
+    }
+
+    setArchivo(nuevoArchivo)
+    setError('')
+  }
+
+  function quitarArchivo() {
+    setArchivo(null)
+
+    if (archivoRef.current) {
+      archivoRef.current.value = ''
+    }
+  }
+
   async function enviarMensaje(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault()
 
     const contenido = texto.trim()
 
-    if (!contenido || enviando || cerrada || !usuario) return
+    if ((!contenido && !archivo) || enviando || cerrada || !usuario) {
+      return
+    }
 
+    if (!contenido) {
+      setError('Escribe un mensaje para acompañar la imagen.')
+      return
+    }
+
+    const archivoSeleccionado = archivo
     const idTemporal = `temporal-${Date.now()}`
 
     const mensajeTemporal: MensajeConversacion = {
@@ -124,29 +202,72 @@ export function ConversacionSolicitud({
       contenido,
       fecha_envio: new Date().toISOString(),
       estado_envio: 'enviando',
+      adjuntos: [],
     }
 
-    // Mostrar el mensaje inmediatamente sin esperar al servidor.
     setMensajes((actuales) => [...actuales, mensajeTemporal])
     setTexto('')
+    setArchivo(null)
+
+    if (archivoRef.current) {
+      archivoRef.current.value = ''
+    }
+
     setError('')
     setEnviando(true)
 
     try {
-      await api(`/requests/${solicitud.id}/messages`, {
-        method: 'POST',
-        datos: { contenido },
-      })
+      const respuesta = await api<MensajeEnviadoRespuesta>(
+        `/requests/${solicitud.id}/messages`,
+        {
+          method: 'POST',
+          datos: { contenido },
+        },
+      )
+
+      const mensajeId = respuesta.data.id
 
       setMensajes((actuales) =>
         actuales.map((mensaje) =>
           mensaje.id === idTemporal
-            ? { ...mensaje, estado_envio: 'enviado' }
+            ? {
+                ...mensaje,
+                id: mensajeId,
+                estado_envio: 'enviado',
+              }
             : mensaje,
         ),
       )
 
-      // Sin bloquear el chat, sincronizar con el historial del servidor.
+      if (archivoSeleccionado) {
+        try {
+          await subirAdjuntoMensaje(
+            solicitud.id,
+            mensajeId,
+            archivoSeleccionado,
+          )
+
+          const adjuntos = await consultarAdjuntosMensaje(
+            solicitud.id,
+            mensajeId,
+          )
+
+          setMensajes((actuales) =>
+            actuales.map((mensaje) =>
+              mensaje.id === mensajeId
+                ? { ...mensaje, adjuntos }
+                : mensaje,
+            ),
+          )
+        } catch (err) {
+          setError(
+            err instanceof Error
+              ? `El mensaje se envió, pero no se pudo adjuntar la imagen: ${err.message}`
+              : 'El mensaje se envió, pero no se pudo adjuntar la imagen.',
+          )
+        }
+      }
+
       void cargarMensajes()
     } catch (err) {
       setMensajes((actuales) =>
@@ -183,15 +304,22 @@ export function ConversacionSolicitud({
     )
 
     try {
-      await api(`/requests/${solicitud.id}/messages`, {
-        method: 'POST',
-        datos: { contenido: mensaje.contenido },
-      })
+      const respuesta = await api<MensajeEnviadoRespuesta>(
+        `/requests/${solicitud.id}/messages`,
+        {
+          method: 'POST',
+          datos: { contenido: mensaje.contenido },
+        },
+      )
 
       setMensajes((actuales) =>
         actuales.map((actual) =>
           actual.id === mensaje.id
-            ? { ...actual, estado_envio: 'enviado' }
+            ? {
+                ...actual,
+                id: respuesta.data.id,
+                estado_envio: 'enviado',
+              }
             : actual,
         ),
       )
@@ -300,6 +428,26 @@ export function ConversacionSolicitud({
                       {mensaje.contenido}
                     </p>
 
+                    {mensaje.adjuntos && mensaje.adjuntos.length > 0 && (
+                      <div className="mt-3 space-y-2">
+                        {mensaje.adjuntos.map((adjunto) => (
+                          <div
+                            key={adjunto.id}
+                            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs ${
+                              propio
+                                ? 'bg-blue-700/70 text-white'
+                                : 'bg-slate-100 text-slate-700'
+                            }`}
+                          >
+                            <span className="text-lg">🖼</span>
+                            <span className="min-w-0 break-all">
+                              {adjunto.nombre_archivo}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
                     <div
                       className={`mt-2 flex items-center justify-end gap-2 text-[11px] ${
                         propio ? 'text-blue-100' : 'text-slate-400'
@@ -346,35 +494,90 @@ export function ConversacionSolicitud({
         ) : (
           <form
             onSubmit={enviarMensaje}
-            className="flex shrink-0 items-end gap-3 border-t border-slate-200 bg-white p-4 sm:px-6 sm:py-5"
+            className="shrink-0 border-t border-slate-200 bg-white p-4 sm:px-6 sm:py-5"
           >
-            <textarea
-              ref={campoRef}
-              value={texto}
-              onChange={(evento) => setTexto(evento.target.value)}
-              onKeyDown={(evento) => {
-                if (
-                  evento.key === 'Enter' &&
-                  !evento.shiftKey &&
-                  !evento.nativeEvent.isComposing
-                ) {
-                  evento.preventDefault()
-                  evento.currentTarget.form?.requestSubmit()
-                }
-              }}
-              rows={2}
-              maxLength={5000}
-              placeholder="Escribe tu mensaje..."
-              className="max-h-32 min-h-12 flex-1 resize-y rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-            />
+            {archivo && vistaPrevia && (
+              <div className="mb-3 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <img
+                  src={vistaPrevia}
+                  alt="Vista previa del adjunto"
+                  className="h-16 w-16 rounded-lg object-cover"
+                />
 
-            <button
-              type="submit"
-              disabled={!texto.trim() || enviando}
-              className="shrink-0 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {enviando ? 'Enviando...' : 'Enviar'}
-            </button>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-slate-700">
+                    {archivo.name}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {(archivo.size / 1024 / 1024).toFixed(2)} MB
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={quitarArchivo}
+                  disabled={enviando}
+                  className="rounded-lg px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                >
+                  Quitar
+                </button>
+              </div>
+            )}
+
+            <div className="flex items-end gap-3">
+              <input
+                ref={archivoRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(evento) =>
+                  seleccionarArchivo(evento.target.files?.[0])
+                }
+              />
+
+              <button
+                type="button"
+                onClick={() => archivoRef.current?.click()}
+                disabled={enviando}
+                title="Adjuntar imagen"
+                aria-label="Adjuntar imagen"
+                className="shrink-0 rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 text-xl text-slate-600 transition hover:bg-slate-100 disabled:opacity-50"
+              >
+                +
+              </button>
+
+              <textarea
+                ref={campoRef}
+                value={texto}
+                onChange={(evento) => setTexto(evento.target.value)}
+                onKeyDown={(evento) => {
+                  if (
+                    evento.key === 'Enter' &&
+                    !evento.shiftKey &&
+                    !evento.nativeEvent.isComposing
+                  ) {
+                    evento.preventDefault()
+                    evento.currentTarget.form?.requestSubmit()
+                  }
+                }}
+                rows={2}
+                maxLength={5000}
+                placeholder="Escribe tu mensaje..."
+                className="max-h-32 min-h-12 flex-1 resize-y rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
+
+              <button
+                type="submit"
+                disabled={(!texto.trim() && !archivo) || enviando}
+                className="shrink-0 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {enviando ? 'Enviando...' : 'Enviar'}
+              </button>
+            </div>
+
+            <p className="mt-2 pl-1 text-xs text-slate-400">
+              Puedes adjuntar imágenes de hasta 10 MB.
+            </p>
           </form>
         )}
       </section>

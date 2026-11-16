@@ -1,22 +1,14 @@
-"""Endpoints de la conversación: RF-22, RF-23 y RF-26 (docs/contrato-api.md §12)."""
+
+"""Endpoints de la conversación: RF-22, RF-23 y RF-24."""
 
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query, File, UploadFile
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.orm import Session
 
-
-from fastapi import File, UploadFile
-
-from app.core.errors import ApiError
-from app.services.adjuntos import ErrorStorage
-from app.services.adjuntos_mensajes import (
-    registrar_adjunto_mensaje,
-    consultar_adjuntos_mensaje,
-)
-
 from app.api.dependencies import UsuarioActual, get_current_user
+from app.core.errors import ApiError
 from app.database.session import get_db
 from app.schemas.mensajes import (
     EnviarMensaje,
@@ -24,12 +16,24 @@ from app.schemas.mensajes import (
     MensajeEnviadoRespuesta,
     MensajesLista,
 )
+from app.services.adjuntos import (
+    ErrorStorage,
+    crear_url_firmada,
+)
+from app.services.adjuntos_mensajes import (
+    consultar_adjuntos_mensaje,
+    registrar_adjunto_mensaje,
+)
 from app.services.mensajes import enviar_mensaje, listar_mensajes
+
 
 router = APIRouter(tags=["Mensajes"])
 
 
-@router.get("/requests/{solicitud_id}/messages", response_model=MensajesLista)
+@router.get(
+    "/requests/{solicitud_id}/messages",
+    response_model=MensajesLista,
+)
 def consultar(
     solicitud_id: uuid.UUID,
     page: int = Query(default=1, ge=1),
@@ -38,7 +42,7 @@ def consultar(
     db: Session = Depends(get_db),
     usuario: UsuarioActual = Depends(get_current_user),
 ):
-    """Conversación de la solicitud en orden cronológico (RF-22, RF-26)."""
+    """Consulta la conversación de una solicitud."""
 
     return listar_mensajes(
         db=db,
@@ -62,7 +66,7 @@ def enviar(
     db: Session = Depends(get_db),
     usuario: UsuarioActual = Depends(get_current_user),
 ):
-    """Envía un mensaje a la conversación de la solicitud (RF-23)."""
+    """Envía un mensaje a la conversación."""
 
     mensaje = enviar_mensaje(
         db=db,
@@ -71,10 +75,12 @@ def enviar(
         rol=usuario.rol,
         datos=datos,
     )
+
     return MensajeEnviadoRespuesta(
         mensaje="Mensaje enviado correctamente",
         data=MensajeCreado.model_validate(mensaje),
     )
+
 
 @router.post(
     "/requests/{solicitud_id}/messages/{mensaje_id}/attachments",
@@ -87,7 +93,7 @@ def adjuntar_imagen_mensaje(
     db: Session = Depends(get_db),
     usuario: UsuarioActual = Depends(get_current_user),
 ):
-    """RF-24: adjunta una imagen WebP a un mensaje."""
+    """Adjunta una imagen WebP a un mensaje."""
 
     try:
         adjunto = registrar_adjunto_mensaje(
@@ -128,7 +134,7 @@ def obtener_adjuntos_mensaje(
     db: Session = Depends(get_db),
     usuario: UsuarioActual = Depends(get_current_user),
 ):
-    """RF-24: consulta los adjuntos de un mensaje."""
+    """Consulta los adjuntos y genera URL temporales para sus imágenes."""
 
     adjuntos = consultar_adjuntos_mensaje(
         db=db,
@@ -138,8 +144,19 @@ def obtener_adjuntos_mensaje(
         rol=usuario.rol,
     )
 
-    return {
-        "data": [
+    data = []
+
+    for adjunto in adjuntos:
+        try:
+            url = crear_url_firmada(adjunto.ruta_storage)
+        except ErrorStorage as error:
+            raise ApiError(
+                502,
+                "ERROR_OBTENER_IMAGEN",
+                "No fue posible obtener la imagen adjunta.",
+            ) from error
+
+        data.append(
             {
                 "id": adjunto.id,
                 "mensaje_id": adjunto.mensaje_id,
@@ -148,7 +165,8 @@ def obtener_adjuntos_mensaje(
                 "tamano": adjunto.tamano,
                 "subido_por": adjunto.subido_por,
                 "fecha_subida": adjunto.fecha_subida,
+                "url": url,
             }
-            for adjunto in adjuntos
-        ]
-    }
+        )
+
+    return {"data": data}
