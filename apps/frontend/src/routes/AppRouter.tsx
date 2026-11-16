@@ -4,12 +4,15 @@ import {
   Navigate,
   Route,
   Routes,
+  useLocation,
 } from 'react-router-dom'
 
 import { PanelLayout } from '../layouts/PanelLayout'
 import { AuthProvider, useAuth } from '../hooks/useAuth'
 import { LoginPage } from '../pages/LoginPage'
 import { SolicitanteDashboardPage } from '../pages/solicitante/SolicitanteDashboardPage'
+import { PerfilSolicitantePage } from '../pages/solicitante/PerfilSolicitantePage'
+import { CambiarContrasenaPage } from '../pages/solicitante/CambiarContrasenaPage'
 import { RutaProtegida } from './RutaProtegida'
 
 function InicioSegunRol() {
@@ -69,17 +72,40 @@ function ModuloPendiente() {
 }
 
 function PanelSolicitante() {
+  const ubicacion = useLocation()
+
+  const titulos: Record<string, string> = {
+    '/solicitante': 'Panel del solicitante',
+    '/solicitante/perfil': 'Mi perfil',
+    '/solicitante/cambiar-contrasena': 'Cambiar contraseña',
+  }
+
   return (
     <PanelLayout
-      titulo="Panel del solicitante"
+      titulo={titulos[ubicacion.pathname] ?? 'Panel del solicitante'}
       navegacion={[
         {
           nombre: 'Mis casos',
           ruta: '/solicitante',
         },
+        {
+          nombre: 'Mi perfil',
+          ruta: '/solicitante/perfil',
+        },
+        {
+          nombre: 'Cambiar contraseña',
+          ruta: '/solicitante/cambiar-contrasena',
+        },
       ]}
     >
-      <SolicitanteDashboardPage />
+      <Routes>
+        <Route index element={<SolicitanteDashboardPage />} />
+        <Route path="perfil" element={<PerfilSolicitantePage />} />
+        <Route
+          path="cambiar-contrasena"
+          element={<CambiarContrasenaPage />}
+        />
+      </Routes>
     </PanelLayout>
   )
 }

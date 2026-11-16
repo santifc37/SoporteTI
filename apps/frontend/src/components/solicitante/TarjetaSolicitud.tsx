@@ -7,6 +7,7 @@ import type {
 interface TarjetaSolicitudProps {
   solicitud: SolicitudResumen
   onVerConversacion: () => void
+  onCancelar: () => void
 }
 
 const NOMBRES_ESTADO: Record<EstadoSolicitud, string> = {
@@ -45,7 +46,12 @@ function formatearFecha(fecha: string): string {
 export function TarjetaSolicitud({
   solicitud,
   onVerConversacion,
+  onCancelar,
 }: TarjetaSolicitudProps) {
+  const permiteCancelar =
+    solicitud.estado === 'registrado' ||
+    solicitud.estado === 'en_evaluacion'
+
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-md">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -89,7 +95,7 @@ export function TarjetaSolicitud({
         </p>
       </div>
 
-      <div className="mt-4 border-t border-slate-100 pt-3">
+      <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
         <button
           type="button"
           onClick={onVerConversacion}
@@ -97,6 +103,16 @@ export function TarjetaSolicitud({
         >
           Ver conversación
         </button>
+
+        {permiteCancelar && (
+          <button
+            type="button"
+            onClick={onCancelar}
+            className="rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50"
+          >
+            Cancelar solicitud
+          </button>
+        )}
       </div>
     </article>
   )

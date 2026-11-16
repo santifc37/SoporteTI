@@ -45,6 +45,8 @@ class LoginRespuesta(BaseModel):
 
 class UsuarioActualDetalle(UsuarioSesion):
     activo: bool
+    telefono: str | None = None
+    medio_contacto_preferido: str
 
 
 class MeRespuesta(BaseModel):

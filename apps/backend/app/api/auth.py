@@ -100,5 +100,7 @@ def me(usuario: UsuarioActual = Depends(get_current_user)):
             correo=usuario.correo,
             rol=usuario.rol,
             activo=usuario.activo,
+            telefono=usuario.telefono,
+            medio_contacto_preferido=usuario.medio_contacto_preferido,
         )
     )

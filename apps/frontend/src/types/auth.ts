@@ -1,6 +1,8 @@
 
 export type RolUsuario = 'solicitante' | 'tecnico' | 'coordinador'
 
+export type MedioContacto = 'correo' | 'telefono'
+
 export interface Usuario {
   id: string
   nombre: string
@@ -8,6 +10,8 @@ export interface Usuario {
   correo: string
   rol: RolUsuario
   activo?: boolean
+  telefono?: string | null
+  medio_contacto_preferido?: MedioContacto
 }
 
 export interface LoginRequest {
@@ -17,11 +21,18 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   mensaje: string
-  usuario: Omit<Usuario, 'activo'>
+  usuario: Omit<Usuario, 'activo' | 'telefono' | 'medio_contacto_preferido'>
 }
 
 export interface MeResponse {
   usuario: Usuario
+}
+
+export interface ActualizarPerfilRequest {
+  nombre?: string
+  apellido?: string
+  telefono?: string | null
+  medio_contacto_preferido?: MedioContacto
 }
 
 export interface MensajeResponse {

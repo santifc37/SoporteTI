@@ -24,6 +24,7 @@ interface AuthContextType {
   cargando: boolean
   login: (datos: LoginRequest) => Promise<Usuario>
   logout: () => Promise<void>
+  refrescarUsuario: () => Promise<Usuario>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -36,11 +37,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [usuario, setUsuario] = useState<Usuario | null>(null)
   const [cargando, setCargando] = useState(true)
 
+  const refrescarUsuario = useCallback(async (): Promise<Usuario> => {
+    const respuesta = await obtenerUsuario()
+    setUsuario(respuesta.usuario)
+    return respuesta.usuario
+  }, [])
+
   useEffect(() => {
     async function verificarSesion() {
       try {
-        const respuesta = await obtenerUsuario()
-        setUsuario(respuesta.usuario)
+        await refrescarUsuario()
       } catch {
         setUsuario(null)
       } finally {
@@ -49,7 +55,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     void verificarSesion()
-  }, [])
+  }, [refrescarUsuario])
 
   const login = useCallback(async (datos: LoginRequest): Promise<Usuario> => {
     const respuesta = await iniciarSesion(datos)
@@ -67,7 +73,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   return (
     <AuthContext.Provider
-      value={{ usuario, cargando, login, logout }}
+      value={{
+        usuario,
+        cargando,
+        login,
+        logout,
+        refrescarUsuario,
+      }}
     >
       {children}
     </AuthContext.Provider>

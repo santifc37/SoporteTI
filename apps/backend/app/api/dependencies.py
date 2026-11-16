@@ -1,3 +1,4 @@
+
 """Dependencias compartidas de la API."""
 
 import uuid
@@ -22,6 +23,8 @@ class UsuarioActual:
     apellido: str
     correo: str
     activo: bool
+    telefono: str | None
+    medio_contacto_preferido: str
     sesion_id: uuid.UUID
 
 
@@ -37,7 +40,9 @@ def get_current_user(
     resultado = obtener_sesion_valida(db, token) if token else None
     if resultado is None:
         raise ApiError(
-            401, "SESION_NO_VALIDA", "Debes iniciar sesión para realizar esta operación."
+            401,
+            "SESION_NO_VALIDA",
+            "Debes iniciar sesión para realizar esta operación.",
         )
 
     sesion, usuario = resultado
@@ -48,5 +53,7 @@ def get_current_user(
         apellido=usuario.apellido,
         correo=usuario.correo,
         activo=usuario.activo,
+        telefono=usuario.telefono,
+        medio_contacto_preferido=usuario.medio_contacto_preferido,
         sesion_id=sesion.id,
     )
