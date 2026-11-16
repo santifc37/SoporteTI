@@ -1,10 +1,11 @@
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 
 import { Boton } from '../../components/Boton'
 import { Cargando } from '../../components/Cargando'
 import { MensajeEstado } from '../../components/MensajeEstado'
+import { useAuth } from '../../hooks/useAuth'
 import { api } from '../../services/api'
 
 import type {
@@ -33,6 +34,29 @@ interface FormularioSolicitud {
   placa_equipo: string
   medio_contacto: 'correo' | 'telefono'
   dato_contacto: string
+}
+
+interface MensajeConversacion {
+  id: string
+  solicitud_id: string
+  remitente: {
+    id: string
+    nombre: string
+    rol: string
+  }
+  contenido: string
+  fecha_envio: string
+  estado_envio?: 'enviando' | 'enviado' | 'error'
+}
+
+interface MensajesPagina {
+  data: MensajeConversacion[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    total_pages: number
+  }
 }
 
 const FORMULARIO_INICIAL: FormularioSolicitud = {
@@ -90,6 +114,17 @@ function formatearFecha(fecha: string): string {
   }).format(valor)
 }
 
+function formatearHora(fecha: string): string {
+  const valor = new Date(fecha)
+
+  if (Number.isNaN(valor.getTime())) return ''
+
+  return new Intl.DateTimeFormat('es-CO', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(valor)
+}
+
 function ordenarSolicitudes(solicitudes: SolicitudResumen[]) {
   return [...solicitudes].sort((a, b) => {
     const aCerrada = a.estado === 'cerrado' || a.estado === 'resuelto'
@@ -115,8 +150,10 @@ function ordenarSolicitudes(solicitudes: SolicitudResumen[]) {
 
 function TarjetaSolicitud({
   solicitud,
+  onVerConversacion,
 }: {
   solicitud: SolicitudResumen
+  onVerConversacion: () => void
 }) {
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-md">
@@ -142,24 +179,377 @@ function TarjetaSolicitud({
           <span className="font-medium text-slate-800">Tipo:</span>{' '}
           <span className="capitalize">{solicitud.tipo}</span>
         </p>
+
         <p className="text-slate-600">
           <span className="font-medium text-slate-800">Prioridad:</span>{' '}
           <span className="capitalize">
             {solicitud.prioridad ?? 'Pendiente'}
           </span>
         </p>
+
         <p className="text-slate-600">
           <span className="font-medium text-slate-800">Categoría:</span>{' '}
           {solicitud.categoria?.nombre ?? 'Sin categoría'}
         </p>
+
         <p className="text-slate-500">
           {formatearFecha(solicitud.fecha_creacion)}
         </p>
+      </div>
+
+      <div className="mt-4 border-t border-slate-100 pt-3">
+        <button
+          type="button"
+          onClick={onVerConversacion}
+          className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+        >
+          Ver conversación
+        </button>
       </div>
     </article>
   )
 }
 
+function ConversacionSolicitud({
+  solicitud,
+  onCerrar,
+}: {
+  solicitud: SolicitudResumen
+  onCerrar: () => void
+}) {
+  const { usuario } = useAuth()
+
+  const [mensajes, setMensajes] = useState<MensajeConversacion[]>([])
+  const [texto, setTexto] = useState('')
+  const [cargando, setCargando] = useState(true)
+  const [enviando, setEnviando] = useState(false)
+  const [error, setError] = useState('')
+
+  const historialRef = useRef<HTMLDivElement>(null)
+  const campoRef = useRef<HTMLTextAreaElement>(null)
+
+  const cerrada = solicitud.estado === 'cerrado'
+
+  async function cargarMensajes() {
+    try {
+      const respuesta = await api<MensajesPagina>(
+        `/requests/${solicitud.id}/messages?page=1&limit=100`,
+      )
+
+      setMensajes(
+        respuesta.data.map((mensaje) => ({
+          ...mensaje,
+          estado_envio: 'enviado',
+        })),
+      )
+
+      setError('')
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'No fue posible cargar la conversación.',
+      )
+    } finally {
+      setCargando(false)
+    }
+  }
+
+  useEffect(() => {
+    void cargarMensajes()
+    // La conversación corresponde a una solicitud concreta.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [solicitud.id])
+
+  useEffect(() => {
+    const historial = historialRef.current
+
+    if (!historial) return
+
+    historial.scrollTo({
+      top: historial.scrollHeight,
+      behavior: 'smooth',
+    })
+  }, [mensajes])
+
+  async function enviarMensaje(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault()
+
+    const contenido = texto.trim()
+
+    if (!contenido || enviando || cerrada || !usuario) return
+
+    const idTemporal = `temporal-${Date.now()}`
+
+    const mensajeTemporal: MensajeConversacion = {
+      id: idTemporal,
+      solicitud_id: solicitud.id,
+      remitente: {
+        id: usuario.id,
+        nombre: `${usuario.nombre} ${usuario.apellido}`.trim(),
+        rol: usuario.rol,
+      },
+      contenido,
+      fecha_envio: new Date().toISOString(),
+      estado_envio: 'enviando',
+    }
+
+    // Mostrar inmediatamente el mensaje, sin esperar al servidor.
+    setMensajes((actuales) => [...actuales, mensajeTemporal])
+    setTexto('')
+    setError('')
+    setEnviando(true)
+
+    try {
+      await api(`/requests/${solicitud.id}/messages`, {
+        method: 'POST',
+        datos: { contenido },
+      })
+
+      // El servidor confirmó el guardado.
+      setMensajes((actuales) =>
+        actuales.map((mensaje) =>
+          mensaje.id === idTemporal
+            ? { ...mensaje, estado_envio: 'enviado' }
+            : mensaje,
+        ),
+      )
+
+      // Sin bloquear la conversación, sincronizar con el historial real.
+      void cargarMensajes()
+    } catch (err) {
+      setMensajes((actuales) =>
+        actuales.map((mensaje) =>
+          mensaje.id === idTemporal
+            ? { ...mensaje, estado_envio: 'error' }
+            : mensaje,
+        ),
+      )
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'No fue posible enviar el mensaje. Puedes reintentarlo.',
+      )
+    } finally {
+      setEnviando(false)
+      campoRef.current?.focus()
+    }
+  }
+
+  async function reintentarMensaje(mensaje: MensajeConversacion) {
+    if (enviando) return
+
+    setError('')
+    setEnviando(true)
+
+    setMensajes((actuales) =>
+      actuales.map((actual) =>
+        actual.id === mensaje.id
+          ? { ...actual, estado_envio: 'enviando' }
+          : actual,
+      ),
+    )
+
+    try {
+      await api(`/requests/${solicitud.id}/messages`, {
+        method: 'POST',
+        datos: { contenido: mensaje.contenido },
+      })
+
+      setMensajes((actuales) =>
+        actuales.map((actual) =>
+          actual.id === mensaje.id
+            ? { ...actual, estado_envio: 'enviado' }
+            : actual,
+        ),
+      )
+
+      void cargarMensajes()
+    } catch (err) {
+      setMensajes((actuales) =>
+        actuales.map((actual) =>
+          actual.id === mensaje.id
+            ? { ...actual, estado_envio: 'error' }
+            : actual,
+        ),
+      )
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'No fue posible reenviar el mensaje.',
+      )
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-2 sm:p-5">
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="titulo-conversacion"
+        className="flex h-[94dvh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-2xl"
+      >
+        <header className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-200 bg-white px-5 py-4 sm:px-7">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {solicitud.numero}
+            </p>
+
+            <h2
+              id="titulo-conversacion"
+              className="mt-1 truncate text-lg font-bold text-slate-900 sm:text-xl"
+            >
+              Conversación
+            </h2>
+
+            <p className="mt-1 truncate text-sm text-slate-500">
+              {solicitud.titulo}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onCerrar}
+            aria-label="Cerrar conversación"
+            className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-xl text-slate-600 transition hover:bg-slate-100"
+          >
+            ×
+          </button>
+        </header>
+
+        <div
+          ref={historialRef}
+          className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-slate-100/80 p-4 sm:p-7"
+        >
+          {cargando ? (
+            <p className="py-10 text-center text-sm text-slate-500">
+              Cargando conversación...
+            </p>
+          ) : mensajes.length === 0 ? (
+            <div className="flex h-full flex-col items-center justify-center text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-2xl text-slate-400 shadow-sm">
+                ☰
+              </div>
+
+              <p className="mt-4 font-semibold text-slate-700">
+                Todavía no hay mensajes
+              </p>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Escribe el primer mensaje para iniciar la conversación.
+              </p>
+            </div>
+          ) : (
+            mensajes.map((mensaje) => {
+              const propio = mensaje.remitente.id === usuario?.id
+
+              return (
+                <div
+                  key={mensaje.id}
+                  className={`flex ${propio ? 'justify-end' : 'justify-start'}`}
+                >
+                  <article
+                    className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm sm:max-w-[70%] ${
+                      propio
+                        ? 'rounded-br-sm bg-blue-600 text-white'
+                        : 'rounded-bl-sm border border-slate-200 bg-white text-slate-800'
+                    }`}
+                  >
+                    {!propio && (
+                      <p className="mb-1 text-xs font-bold text-blue-700">
+                        {mensaje.remitente.nombre}
+                      </p>
+                    )}
+
+                    <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
+                      {mensaje.contenido}
+                    </p>
+
+                    <div
+                      className={`mt-2 flex items-center justify-end gap-2 text-[11px] ${
+                        propio ? 'text-blue-100' : 'text-slate-400'
+                      }`}
+                    >
+                      <span>{formatearHora(mensaje.fecha_envio)}</span>
+
+                      {propio && mensaje.estado_envio === 'enviando' && (
+                        <span>Enviando...</span>
+                      )}
+
+                      {propio && mensaje.estado_envio === 'enviado' && (
+                        <span>Enviado ✓</span>
+                      )}
+
+                      {propio && mensaje.estado_envio === 'error' && (
+                        <button
+                          type="button"
+                          onClick={() => void reintentarMensaje(mensaje)}
+                          className="font-bold underline"
+                        >
+                          Reintentar
+                        </button>
+                      )}
+                    </div>
+                  </article>
+                </div>
+              )
+            })
+          )}
+        </div>
+
+        {error && (
+          <div className="shrink-0 border-t border-red-200 bg-red-50 px-5 py-2 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        {cerrada ? (
+          <div className="shrink-0 border-t border-slate-200 bg-white px-5 py-4 text-center text-sm text-slate-500">
+            Esta solicitud está cerrada. Puedes consultar los mensajes, pero
+            no enviar nuevos.
+          </div>
+        ) : (
+          <form
+            onSubmit={enviarMensaje}
+            className="flex shrink-0 items-end gap-3 border-t border-slate-200 bg-white p-4 sm:px-6 sm:py-5"
+          >
+            <textarea
+              ref={campoRef}
+              value={texto}
+              onChange={(evento) => setTexto(evento.target.value)}
+              onKeyDown={(evento) => {
+                if (
+                  evento.key === 'Enter' &&
+                  !evento.shiftKey &&
+                  !evento.nativeEvent.isComposing
+                ) {
+                  evento.preventDefault()
+                  evento.currentTarget.form?.requestSubmit()
+                }
+              }}
+              rows={2}
+              maxLength={5000}
+              placeholder="Escribe tu mensaje..."
+              className="max-h-32 min-h-12 flex-1 resize-y rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            />
+
+            <button
+              type="submit"
+              disabled={!texto.trim() || enviando}
+              className="shrink-0 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {enviando ? 'Enviando...' : 'Enviar'}
+            </button>
+          </form>
+        )}
+      </section>
+    </div>
+  )
+}
 
 function FormularioNuevaSolicitud({
   onCerrar,
@@ -252,6 +642,7 @@ function FormularioNuevaSolicitud({
             >
               Nueva solicitud
             </h2>
+
             <p className="mt-1 text-xs text-slate-500 sm:text-sm">
               Cuéntanos qué problema o requerimiento necesitas reportar.
             </p>
@@ -278,6 +669,7 @@ function FormularioNuevaSolicitud({
               <label htmlFor="titulo" className={ETIQUETA}>
                 Título de la solicitud *
               </label>
+
               <input
                 id="titulo"
                 required
@@ -293,6 +685,7 @@ function FormularioNuevaSolicitud({
               <label htmlFor="descripcion" className={ETIQUETA}>
                 Descripción del problema *
               </label>
+
               <textarea
                 id="descripcion"
                 required
@@ -310,6 +703,7 @@ function FormularioNuevaSolicitud({
                 <label htmlFor="tipo" className={ETIQUETA}>
                   Tipo de solicitud *
                 </label>
+
                 <select
                   id="tipo"
                   value={formulario.tipo}
@@ -327,6 +721,7 @@ function FormularioNuevaSolicitud({
                 <label htmlFor="categoria" className={ETIQUETA}>
                   Categoría
                 </label>
+
                 <select
                   id="categoria"
                   value={formulario.categoria_id}
@@ -339,6 +734,7 @@ function FormularioNuevaSolicitud({
                       ? 'Cargando categorías...'
                       : 'Seleccionar categoría'}
                   </option>
+
                   {categorias.map((categoria) => (
                     <option key={categoria.id} value={categoria.id}>
                       {categoria.nombre}
@@ -353,6 +749,7 @@ function FormularioNuevaSolicitud({
                 <label htmlFor="ubicacion" className={ETIQUETA}>
                   Ubicación *
                 </label>
+
                 <input
                   id="ubicacion"
                   required
@@ -368,6 +765,7 @@ function FormularioNuevaSolicitud({
                 <label htmlFor="placa_equipo" className={ETIQUETA}>
                   Placa del equipo
                 </label>
+
                 <input
                   id="placa_equipo"
                   maxLength={50}
@@ -391,6 +789,7 @@ function FormularioNuevaSolicitud({
                   <label htmlFor="medio_contacto" className={ETIQUETA}>
                     Medio de contacto *
                   </label>
+
                   <select
                     id="medio_contacto"
                     value={formulario.medio_contacto}
@@ -413,6 +812,7 @@ function FormularioNuevaSolicitud({
                       ? 'Correo electrónico *'
                       : 'Número de teléfono *'}
                   </label>
+
                   <input
                     id="dato_contacto"
                     required
@@ -464,12 +864,13 @@ function FormularioNuevaSolicitud({
   )
 }
 
-
 export function SolicitanteDashboardPage() {
   const [resultado, setResultado] = useState<SolicitudesPagina | null>(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
   const [mostrarFormulario, setMostrarFormulario] = useState(false)
+  const [solicitudConversacion, setSolicitudConversacion] =
+    useState<SolicitudResumen | null>(null)
   const [recarga, setRecarga] = useState(0)
   const [mensajeExito, setMensajeExito] = useState('')
 
@@ -481,11 +882,13 @@ export function SolicitanteDashboardPage() {
     api<SolicitudesPagina>('/requests?page=1&limit=100')
       .then((respuesta) => {
         if (!vigente) return
+
         setResultado(respuesta)
         setError('')
       })
       .catch((err: unknown) => {
         if (!vigente) return
+
         setError(
           err instanceof Error
             ? err.message
@@ -517,6 +920,7 @@ export function SolicitanteDashboardPage() {
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Mis casos</h1>
+
           <p className="mt-1 text-sm text-slate-600">
             Consulta el estado de tus solicitudes de soporte.
           </p>
@@ -545,7 +949,11 @@ export function SolicitanteDashboardPage() {
       ) : solicitudesOrdenadas.length > 0 ? (
         <div className="space-y-4">
           {solicitudesOrdenadas.map((solicitud) => (
-            <TarjetaSolicitud key={solicitud.id} solicitud={solicitud} />
+            <TarjetaSolicitud
+              key={solicitud.id}
+              solicitud={solicitud}
+              onVerConversacion={() => setSolicitudConversacion(solicitud)}
+            />
           ))}
         </div>
       ) : (
@@ -554,13 +962,16 @@ export function SolicitanteDashboardPage() {
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500">
               <span className="text-xl">+</span>
             </div>
+
             <h2 className="mt-4 text-lg font-semibold text-slate-900">
               Todavía no tienes casos registrados
             </h2>
+
             <p className="mt-2 text-sm text-slate-600">
               Cuando registres una solicitud, podrás consultar aquí su estado
               y seguimiento.
             </p>
+
             <div className="mt-5">
               <Boton onClick={() => setMostrarFormulario(true)}>
                 Crear mi primera solicitud
@@ -574,6 +985,13 @@ export function SolicitanteDashboardPage() {
         <FormularioNuevaSolicitud
           onCerrar={() => setMostrarFormulario(false)}
           onCreada={solicitudCreada}
+        />
+      )}
+
+      {solicitudConversacion && (
+        <ConversacionSolicitud
+          solicitud={solicitudConversacion}
+          onCerrar={() => setSolicitudConversacion(null)}
         />
       )}
     </section>
