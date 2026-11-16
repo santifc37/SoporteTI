@@ -1,0 +1,61 @@
+[1mdiff --git a/apps/backend/app/api/solicitudes.py b/apps/backend/app/api/solicitudes.py[m
+[1mindex 7435936..5d4b461 100644[m
+[1m--- a/apps/backend/app/api/solicitudes.py[m
+[1m+++ b/apps/backend/app/api/solicitudes.py[m
+[36m@@ -253,56 +253,6 @@[m [mdef crear_peticion_informacion([m
+     }[m
+ [m
+ [m
+[31m-@router.get([m
+[31m-    "/requests/{solicitud_id}/information-requests",[m
+[31m-)[m
+[31m-def obtener_peticiones_informacion([m
+[31m-    solicitud_id: uuid.UUID,[m
+[31m-    db: Session = Depends(get_db),[m
+[31m-    usuario: UsuarioActual = Depends(get_current_user),[m
+[31m-):[m
+[31m-    """RF-18: consulta las peticiones y sus respuestas."""[m
+[31m-[m
+[31m-    peticiones = consultar_solicitudes_informacion([m
+[31m-        db=db,[m
+[31m-        solicitud_id=solicitud_id,[m
+[31m-        usuario_id=usuario.id,[m
+[31m-        rol=usuario.rol,[m
+[31m-    )[m
+[31m-[m
+[31m-    return {"data": peticiones}[m
+[31m-[m
+[31m-[m
+[31m-@router.post([m
+[31m-    "/information-requests/{solicitud_informacion_id}/responses",[m
+[31m-    status_code=201,[m
+[31m-)[m
+[31m-def responder_peticion_informacion([m
+[31m-    solicitud_informacion_id: uuid.UUID,[m
+[31m-    datos: CrearRespuestaInformacion,[m
+[31m-    db: Session = Depends(get_db),[m
+[31m-    usuario: UsuarioActual = Depends(get_current_user),[m
+[31m-):[m
+[31m-    """RF-18: el solicitante propietario responde una petición."""[m
+[31m-[m
+[31m-    if usuario.rol != "solicitante":[m
+[31m-        raise ApiError([m
+[31m-            403,[m
+[31m-            "SIN_PERMISO",[m
+[31m-            "Solo el solicitante puede responder esta petición.",[m
+[31m-        )[m
+[31m-[m
+[31m-    respuesta = responder_solicitud_informacion([m
+[31m-        db=db,[m
+[31m-        solicitud_informacion_id=solicitud_informacion_id,[m
+[31m-        solicitante_id=usuario.id,[m
+[31m-        datos=datos,[m
+[31m-    )[m
+[31m-[m
+[31m-    return {[m
+[31m-        "mensaje": "Respuesta registrada correctamente",[m
+[31m-        "respuesta": RespuestaInformacionRespuesta.model_validate(respuesta),[m
+[31m-    }[m
+ [m
+ [m
+ [m
