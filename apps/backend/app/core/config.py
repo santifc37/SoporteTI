@@ -8,8 +8,14 @@ from dotenv import load_dotenv
 # Ruta de la carpeta apps/backend
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 
-# Cargar las variables del archivo .env
-load_dotenv(BACKEND_DIR / ".env")
+# Seleccionar el archivo de variables según el entorno.
+# APP_ENV=local -> .env.local
+# Cualquier otro valor -> .env
+APP_ENV = os.getenv("APP_ENV", "production").strip().lower()
+
+ENV_FILE = BACKEND_DIR / (".env.local" if APP_ENV == "local" else ".env")
+
+load_dotenv(ENV_FILE)
 
 
 def get_database_url() -> str:
@@ -18,7 +24,7 @@ def get_database_url() -> str:
 
     if not database_url:
         raise RuntimeError(
-            "No se encontró DATABASE_URL. Configura la conexión en apps/backend/.env"
+            f"No se encontró DATABASE_URL. Revisa el archivo {ENV_FILE.name}"
         )
 
     if database_url.startswith("postgres://"):
@@ -51,7 +57,7 @@ def get_session_cookie_secure() -> bool:
 
 
 def get_session_cookie_samesite() -> str:
-    """Atributo SameSite de la cookie: lax (por defecto), strict o none.
+    """Atributo SameSite: lax (por defecto), strict o none.
 
     `none` exige SESSION_COOKIE_SECURE=true y solo se necesita si frontend y
     backend están en sitios distintos.

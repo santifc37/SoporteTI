@@ -18,7 +18,7 @@ El sistema contempla tres roles:
 - **Técnico:** consulta sus solicitudes asignadas, registra intervenciones, solicita información adicional y documenta las soluciones.
 - **Coordinador:** administra usuarios y categorías, evalúa solicitudes, asigna técnicos, supervisa la atención, revisa soluciones, cierra solicitudes y consulta estadísticas.
 
-El sistema aplica permisos en el backend para restringir las operaciones según el rol y la relación del usuario con cada solicitud.
+El backend aplica controles de acceso para restringir las operaciones según el rol y la relación del usuario con cada solicitud.
 
 ## 2. Alcance y requisitos
 
@@ -40,12 +40,15 @@ El proyecto contempla:
 
 No se incluyen notificaciones por correo, SMS o WhatsApp, chat mediante WebSockets ni recuperación automática de contraseñas mediante servicios externos.
 
-**Documentación:**
+### Documentación
+
 - [Requisitos funcionales y no funcionales](docs/requisitos.md).
 - [Diseño de la solución](docs/diseno.md).
 - [Contrato de la API](docs/contrato-api.md).
 - [Guía de desarrollo](docs/guia-desarrollo.md).
 - [Matriz de trazabilidad](docs/trazabilidad.md).
+- [Modelo entidad-relación](docs/MER.md).
+- [Guía de usuarios](docs/usuarios.md).
 
 ## 3. Arquitectura y tecnologías
 
@@ -56,8 +59,7 @@ La solución utiliza una arquitectura cliente-servidor:
 | Frontend | React, TypeScript y Vite | Interfaz de usuario y consumo de la API. |
 | Backend | Python y FastAPI | API REST, reglas de negocio y autorización. |
 | Base de datos | PostgreSQL | Persistencia de usuarios, solicitudes y demás registros. |
-| Plataforma de datos | Supabase | Servicio PostgreSQL. |
-| Almacenamiento | Supabase Storage | Almacenamiento privado de archivos. |
+| Almacenamiento | Supabase Storage | Almacenamiento privado de archivos adjuntos. |
 | ORM | SQLAlchemy | Acceso y persistencia de datos. |
 | Migraciones | Alembic | Evolución del esquema de base de datos. |
 | Pruebas | pytest | Validación automatizada del backend. |
@@ -76,29 +78,59 @@ SoporteTI/
 │   │   │   ├── schemas/
 │   │   │   └── services/
 │   │   ├── alembic/
+│   │   ├── scripts/
 │   │   ├── tests/
 │   │   ├── .env.example
 │   │   └── requirements.txt
 │   └── frontend/
+│       ├── src/
+│       ├── public/
+│       ├── package.json
+│       └── vite.config.ts
 ├── docs/
 ├── evidencias/
 ├── proyecto2.md
 └── README.md
 ```
 
-El código fuente del frontend se encuentra actualmente en las ramas `feature/frontend-base` y `feature/frontend-solicitudes`; su integración en `feature/backend-integrado` está pendiente.
+## 4. Configuración del entorno local
 
-## 4. Configuración del entorno
+El entorno de desarrollo local utiliza:
+
+- PostgreSQL instalado en el equipo.
+- Una base de datos local llamada `soporteti_local`.
+- FastAPI como servidor backend.
+- React y Vite como frontend.
+- Supabase Storage para los archivos adjuntos.
 
 ### 4.1. Requisitos previos
 
 - Git.
 - Python.
-- Node.js y npm para el frontend.
-- Acceso al proyecto de Supabase.
+- Node.js y npm.
+- PostgreSQL.
+- Acceso al proyecto de Supabase para utilizar su almacenamiento.
 - Bucket privado de Supabase Storage llamado `soporteti-adjuntos`.
 
-### 4.2. Configuración del backend
+### 4.2. Configuración de PostgreSQL
+
+Crear una base de datos local llamada:
+
+```text
+soporteti_local
+```
+
+La conexión local utiliza PostgreSQL en `localhost`, puerto `5432`.
+
+Ejemplo de conexión:
+
+```text
+postgresql+psycopg://postgres:CONTRASEÑA@localhost:5432/soporteti_local
+```
+
+La contraseña debe corresponder a la configurada durante la instalación de PostgreSQL.
+
+### 4.3. Configuración del backend
 
 Desde la raíz del repositorio:
 
@@ -125,16 +157,16 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-Crear el archivo de configuración:
+Crear el archivo de configuración local a partir del ejemplo:
 
 ```powershell
-Copy-Item .env.example .env
+Copy-Item .env.example .env.local
 ```
 
-Configurar las variables necesarias en `.env`:
+Editar `apps/backend/.env.local` y configurar las variables:
 
 ```env
-DATABASE_URL=postgresql://...
+DATABASE_URL=postgresql+psycopg://postgres:CONTRASEÑA@localhost:5432/soporteti_local
 
 SUPABASE_URL=https://TU_PROJECT_REF.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=TU_SERVICE_ROLE_KEY
@@ -147,17 +179,35 @@ SESSION_COOKIE_SAMESITE=lax
 CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
 
-La variable `DATABASE_URL` corresponde a la conexión PostgreSQL. Las variables `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` se utilizan para acceder al almacenamiento.
+Las variables de Supabase se conservan para acceder al almacenamiento de archivos. La conexión `DATABASE_URL` apunta a PostgreSQL local.
 
-**Seguridad:**
-- No subir el archivo `.env` al repositorio.
-- No exponer la clave `SUPABASE_SERVICE_ROLE_KEY` en el frontend.
+**Importante:**
+
+- El archivo `.env.local` contiene información privada y no debe subirse al repositorio.
+- No exponer `SUPABASE_SERVICE_ROLE_KEY` en el frontend.
 - Mantener privado el bucket de adjuntos.
 - Utilizar datos ficticios en las demostraciones.
 
-### 4.3. Migraciones de base de datos
+### 4.4. Selección del entorno local
 
-Desde `apps/backend`, con el entorno virtual activado:
+El backend utiliza la variable `APP_ENV` para seleccionar el archivo de configuración:
+
+| Valor | Archivo utilizado |
+|---|---|
+| `local` | `.env.local` |
+| Otro valor o valor predeterminado | `.env` |
+
+Antes de ejecutar los comandos del backend, seleccionar el entorno local:
+
+```powershell
+$env:APP_ENV = "local"
+```
+
+Este comando debe ejecutarse en cada nueva terminal de PowerShell que se utilice para trabajar con el backend.
+
+### 4.5. Migraciones de la base de datos
+
+Desde `apps/backend`, con el entorno virtual activado y `APP_ENV` configurado como `local`:
 
 ```powershell
 alembic upgrade head
@@ -169,9 +219,14 @@ Las migraciones se encuentran en:
 apps/backend/alembic/versions/
 ```
 
-### 4.4. Ejecutar el backend
+Este comando crea o actualiza las tablas de la base de datos local según las migraciones disponibles.
+
+### 4.6. Ejecutar el backend
+
+Desde `apps/backend`, con el entorno virtual activado:
 
 ```powershell
+$env:APP_ENV = "local"
 uvicorn app.main:app --reload
 ```
 
@@ -181,60 +236,123 @@ La API estará disponible en:
 http://127.0.0.1:8000
 ```
 
-La documentación interactiva estará disponible en:
+La documentación interactiva de Swagger estará disponible en:
 
 ```text
 http://127.0.0.1:8000/docs
 ```
 
-## 5. Servicios web implementados
+## 5. Configuración del frontend
 
-La API utiliza el prefijo `/api/v1`.
+Abrir una segunda terminal de PowerShell y ubicarse en:
 
-| Método | Ruta | Descripción |
-|---|---|---|
-| POST | `/api/v1/login` | Inicio de sesión. |
-| POST | `/api/v1/logout` | Cierre de sesión. |
-| GET | `/api/v1/me` | Consulta del usuario autenticado. |
-| POST | `/api/v1/change-password` | Cambio de contraseña. |
-| GET | `/api/v1/users` | Consulta de usuarios. |
-| POST | `/api/v1/users` | Creación de usuarios. |
-| PATCH | `/api/v1/users/{id}` | Actualización de usuarios. |
-| GET | `/api/v1/categories` | Consulta de categorías. |
-| GET | `/api/v1/requests` | Consulta de solicitudes. |
-| POST | `/api/v1/requests` | Creación de solicitudes. |
-| GET | `/api/v1/requests/{id}` | Consulta del detalle de una solicitud. |
-| PATCH | `/api/v1/requests/{id}/status` | Actualización del estado. |
-| POST | `/api/v1/requests/{id}/assignments` | Asignación o reasignación de técnicos. |
-| GET | `/api/v1/requests/{id}/assignments` | Consulta de asignaciones. |
-| POST | `/api/v1/requests/{id}/cancel` | Cancelación de una solicitud. |
-| POST | `/api/v1/requests/{id}/close` | Cierre de una solicitud. |
-| POST | `/api/v1/requests/{id}/resolve` | Registro de una solución. |
-| GET | `/api/v1/requests/{id}/interventions` | Consulta de intervenciones. |
-| POST | `/api/v1/requests/{id}/messages` | Envío de mensajes. |
-| GET | `/api/v1/requests/{id}/messages` | Consulta de mensajes. |
-| POST | `/api/v1/requests/{id}/messages/{message_id}/attachments` | Adjuntos en mensajes. |
-| GET | `/api/v1/requests/{id}/messages/{message_id}/attachments` | Consulta de adjuntos de mensajes. |
-| POST | `/api/v1/requests/{id}/interventions/{intervention_id}/attachments` | Adjuntos en intervenciones. |
-| GET | `/api/v1/requests/{id}/attachments` | Consulta de adjuntos de solicitudes. |
-| GET | `/api/v1/attachments/{id}/download` | Descarga de adjuntos. |
-| GET | `/api/v1/requests/{id}/history` | Consulta del historial de cambios. |
-| GET | `/api/v1/notifications` | Consulta de notificaciones internas. |
-| PATCH | `/api/v1/notifications/read-all` | Marcar notificaciones como leídas. |
-| PATCH | `/api/v1/notifications/{id}/read` | Marcar una notificación como leída. |
-| GET | `/api/v1/statistics` | Consulta de estadísticas. |
-| GET | `/api/v1/health` | Verificación del backend. |
-| GET | `/api/v1/health/db` | Verificación de conexión con la base de datos. |
+```powershell
+cd apps/frontend
+```
+
+Instalar las dependencias:
+
+```powershell
+npm install
+```
+
+Crear el archivo local de variables de entorno:
+
+```powershell
+@"
+VITE_API_URL=/api/v1
+"@ | Set-Content .env.local
+```
+
+El frontend utiliza `VITE_API_URL` para determinar la dirección de la API.
+
+La configuración de Vite utiliza un proxy local que redirige las solicitudes `/api` hacia:
+
+```text
+http://127.0.0.1:8000
+```
+
+Por esta razón, el frontend puede comunicarse con el backend sin configurar una dirección externa durante el desarrollo local.
+
+### Ejecutar el frontend
+
+Desde `apps/frontend`:
+
+```powershell
+npm run dev
+```
+
+La interfaz estará disponible en:
+
+```text
+http://localhost:5173
+```
+
+Para utilizar el sistema local deben estar ejecutándose simultáneamente el backend y el frontend.
+
+## 6. Creación de usuarios locales
+
+El proyecto dispone de un script para crear usuarios directamente en la base de datos seleccionada.
+
+Desde `apps/backend`, con el entorno virtual activado:
+
+```powershell
+$env:APP_ENV = "local"
+```
+
+Ejemplo de creación de un usuario coordinador:
+
+```powershell
+python -m scripts.crear_usuario Admin Local admin.local@soporteti.com coordinador
+```
+
+Ejemplo de creación de un técnico:
+
+```powershell
+python -m scripts.crear_usuario Tecnico Local tecnico.local@soporteti.com tecnico
+```
+
+Ejemplo de creación de un solicitante:
+
+```powershell
+python -m scripts.crear_usuario Solicitante Local solicitante.local@soporteti.com solicitante
+```
+
+El script solicita la contraseña de forma interactiva y la almacena utilizando el mecanismo de hash definido por el backend.
+
+Los roles disponibles son:
+
+- `solicitante`
+- `tecnico`
+- `coordinador`
+
+Para más información, consultar [docs/usuarios.md](docs/usuarios.md).
+
+## 7. Servicios web y API
+
+La API utiliza el prefijo:
+
+```text
+/api/v1
+```
+
+La documentación interactiva de los servicios se puede consultar desde Swagger:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+La especificación de rutas, métodos HTTP, parámetros, cuerpos de petición, respuestas, permisos y errores se encuentra en:
+
+[docs/contrato-api.md](docs/contrato-api.md).
 
 Los permisos de cada operación dependen del rol autenticado y de las reglas definidas para cada solicitud.
 
-La especificación completa de parámetros, cuerpos de petición, respuestas y errores se encuentra en [docs/contrato-api.md](docs/contrato-api.md).
+## 8. Archivos adjuntos
 
-## 6. Archivos adjuntos
+Los adjuntos se procesan desde el backend y se almacenan en Supabase Storage. Sus metadatos y relaciones se conservan en PostgreSQL.
 
-Los adjuntos se procesan desde el backend y se almacenan en Supabase Storage.
-
-El servicio de procesamiento de imágenes contempla:
+El procesamiento de imágenes contempla:
 
 - Validación del contenido real del archivo.
 - Conversión a formato WebP.
@@ -244,11 +362,11 @@ El servicio de procesamiento de imágenes contempla:
 - Registro de metadatos en PostgreSQL.
 - Validación de permisos y estado de la solicitud.
 
-Los adjuntos están asociados a solicitudes, mensajes o intervenciones, según la operación utilizada.
+Los adjuntos pueden asociarse a solicitudes, mensajes o intervenciones, según la operación utilizada.
 
-## 7. Pruebas y evidencias
+## 9. Pruebas y evidencias
 
-### 7.1. Pruebas automatizadas del backend
+### 9.1. Pruebas automatizadas del backend
 
 Desde `apps/backend`, con el entorno virtual activado:
 
@@ -258,10 +376,10 @@ Ejecutar todas las pruebas:
 python -m pytest -q
 ```
 
-Ejecutar las pruebas de un requisito específico:
+Ejecutar las pruebas con mayor detalle:
 
 ```powershell
-python -m pytest tests/test_rf24_adjuntos_mensajes.py -v
+python -m pytest -v
 ```
 
 Los archivos de pruebas se encuentran en:
@@ -270,23 +388,32 @@ Los archivos de pruebas se encuentran en:
 apps/backend/tests/
 ```
 
-Las pruebas cubren autenticación, permisos, usuarios, solicitudes, asignaciones, intervenciones, mensajes, adjuntos, notificaciones, historial y estadísticas.
+Las pruebas automatizadas permiten validar los diferentes módulos y reglas de negocio implementados en el backend.
 
-### 7.2. Pruebas funcionales del proyecto
+### 9.2. Pruebas funcionales del proyecto
 
-La guía del proyecto exige documentar 12 pruebas funcionales reproducibles, incluyendo casos exitosos, entradas inválidas, permisos, persistencia, integridad e integración entre interfaz, API y base de datos.
+Las pruebas funcionales deben documentar escenarios reproducibles que permitan verificar:
 
-**Documento pendiente de consolidación:** `docs/pruebas.md`.
+- Casos exitosos.
+- Entradas inválidas.
+- Permisos según el rol.
+- Persistencia de la información.
+- Integridad de los datos.
+- Integración entre interfaz, API y base de datos.
 
-Las evidencias de ejecución deberán conservarse en la carpeta `evidencias/`.
+Las evidencias de ejecución deben conservarse en:
 
-### 7.3. Matriz de trazabilidad
+```text
+evidencias/
+```
 
-La relación entre condiciones de aceptación, requisitos, implementación, Pull Requests y pruebas se documenta en:
+### 9.3. Matriz de trazabilidad
+
+La relación entre condiciones de aceptación, requisitos funcionales, implementación, Pull Requests y pruebas se documenta en:
 
 [docs/trazabilidad.md](docs/trazabilidad.md).
 
-## 8. Organización del desarrollo
+## 10. Organización del desarrollo
 
 El desarrollo se organiza por módulos y requisitos funcionales.
 
@@ -294,25 +421,23 @@ El desarrollo se organiza por módulos y requisitos funcionales.
 - **Integrante 2:** módulo técnico y frontend del solicitante.
 - **Trabajo compartido:** autenticación, sesiones, modelo de datos, contrato de API, conversaciones e integración.
 
-Cada requisito funcional se desarrolla en una rama independiente y se integra mediante Pull Requests.
+Cada requisito funcional se desarrolla en una rama independiente y se integra mediante Pull Requests, siguiendo el flujo de trabajo definido para el proyecto.
 
 Los cambios deben respetar los requisitos, el diseño, el modelo de datos y el contrato de la API.
 
-## 9. Estado y limitaciones
+## 11. Estado del entorno y consideraciones
 
-El backend integrado contiene módulos para los requisitos funcionales RF-01 a RF-29, incluyendo autenticación, usuarios, solicitudes, atención técnica, conversaciones, adjuntos, notificaciones, historial y estadísticas.
+El entorno local permite ejecutar el backend y el frontend utilizando PostgreSQL instalado en el equipo, sin depender de una conexión a una base de datos PostgreSQL alojada en Supabase.
 
-Para considerar el proyecto completo todavía se debe:
+Supabase Storage continúa siendo utilizado para el almacenamiento de archivos adjuntos.
 
-- Integrar el código fuente del frontend con la rama del backend.
-- Consolidar las 12 pruebas funcionales documentadas y sus evidencias.
-- Actualizar la matriz de trazabilidad con las implementaciones y pruebas reales.
-- Armonizar las restricciones documentadas de los adjuntos con la implementación.
-- Verificar el flujo completo desde la interfaz hasta la persistencia.
+Los archivos de configuración locales (`.env.local`) no deben incluirse en los commits.
+
+El despliegue en producción y sus variables de entorno deben configurarse de manera independiente al entorno local.
 
 El alcance no contempla notificaciones externas por correo, SMS o WhatsApp, ni comunicación en tiempo real mediante WebSockets.
 
-## 10. Documentación complementaria
+## 12. Documentación complementaria
 
 - [Guía principal del proyecto](proyecto2.md).
 - [Requisitos](docs/requisitos.md).
@@ -320,4 +445,5 @@ El alcance no contempla notificaciones externas por correo, SMS o WhatsApp, ni c
 - [Modelo entidad-relación](docs/MER.md).
 - [Contrato de API](docs/contrato-api.md).
 - [Guía de desarrollo](docs/guia-desarrollo.md).
+- [Guía de usuarios](docs/usuarios.md).
 - [Trazabilidad](docs/trazabilidad.md).
