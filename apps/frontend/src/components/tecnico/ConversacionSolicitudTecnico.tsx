@@ -1,5 +1,5 @@
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 
 import { useAuth } from '../../hooks/useAuth'
@@ -46,6 +46,37 @@ interface MensajeEnviadoRespuesta {
   }
 }
 
+interface PeticionInformacion {
+  id: string
+  contenido: string
+  estado: string
+  solicitado_por: {
+    id: string
+    nombre: string
+    rol: string
+  }
+  fecha_solicitud: string
+  respuesta: {
+    id: string
+    solicitud_informacion_id: string
+    respondido_por: string
+    contenido: string
+    fecha_respuesta: string
+  } | null
+}
+
+interface PeticionesInformacionRespuesta {
+  data: PeticionInformacion[]
+}
+
+interface EventoHistorial {
+  id: string
+  tipo: 'mensaje' | 'peticion' | 'respuesta'
+  fecha: string
+  mensaje?: MensajeConversacion
+  peticion?: PeticionInformacion
+}
+
 function formatearHora(fecha: string): string {
   const valor = new Date(fecha)
 
@@ -65,6 +96,7 @@ export function ConversacionSolicitudTecnico({
   const { usuario } = useAuth()
 
   const [mensajes, setMensajes] = useState<MensajeConversacion[]>([])
+  const [peticiones, setPeticiones] = useState<PeticionInformacion[]>([])
   const [texto, setTexto] = useState('')
   const [archivo, setArchivo] = useState<File | null>(null)
   const [cargando, setCargando] = useState(true)
@@ -109,21 +141,82 @@ export function ConversacionSolicitudTecnico({
       )
 
       setMensajes(mensajesConAdjuntos)
-      setError('')
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : 'No fue posible cargar la conversación.',
+          : 'No fue posible cargar los mensajes.',
       )
     } finally {
       setCargando(false)
     }
   }, [solicitud.id])
 
+  const cargarPeticiones = useCallback(async () => {
+    try {
+      const respuesta = await api<PeticionesInformacionRespuesta>(
+        `/requests/${solicitud.id}/information-requests`,
+      )
+
+      setPeticiones(respuesta.data)
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'No fue posible cargar las peticiones de información.',
+      )
+    }
+  }, [solicitud.id])
+
+  const cargarConversacion = useCallback(async () => {
+    await Promise.all([cargarMensajes(), cargarPeticiones()])
+  }, [cargarMensajes, cargarPeticiones])
+
   useEffect(() => {
-    void cargarMensajes()
-  }, [cargarMensajes])
+    void cargarConversacion()
+
+    const intervalo = window.setInterval(() => {
+      void cargarConversacion()
+    }, 15000)
+
+    return () => window.clearInterval(intervalo)
+  }, [cargarConversacion])
+
+  const eventos = useMemo<EventoHistorial[]>(() => {
+    const resultado: EventoHistorial[] = []
+
+    for (const mensaje of mensajes) {
+      resultado.push({
+        id: `mensaje-${mensaje.id}`,
+        tipo: 'mensaje',
+        fecha: mensaje.fecha_envio,
+        mensaje,
+      })
+    }
+
+    for (const peticion of peticiones) {
+      resultado.push({
+        id: `peticion-${peticion.id}`,
+        tipo: 'peticion',
+        fecha: peticion.fecha_solicitud,
+        peticion,
+      })
+
+      if (peticion.respuesta) {
+        resultado.push({
+          id: `respuesta-${peticion.respuesta.id}`,
+          tipo: 'respuesta',
+          fecha: peticion.respuesta.fecha_respuesta,
+          peticion,
+        })
+      }
+    }
+
+    return resultado.sort(
+      (a, b) =>
+        new Date(a.fecha).getTime() - new Date(b.fecha).getTime(),
+    )
+  }, [mensajes, peticiones])
 
   useEffect(() => {
     const historial = historialRef.current
@@ -134,7 +227,7 @@ export function ConversacionSolicitudTecnico({
       top: historial.scrollHeight,
       behavior: 'smooth',
     })
-  }, [mensajes])
+  }, [eventos])
 
   useEffect(() => {
     if (!archivo) {
@@ -267,7 +360,7 @@ export function ConversacionSolicitudTecnico({
         }
       }
 
-      void cargarMensajes()
+      void cargarConversacion()
     } catch (err) {
       setMensajes((actuales) =>
         actuales.map((mensaje) =>
@@ -323,7 +416,7 @@ export function ConversacionSolicitudTecnico({
         ),
       )
 
-      void cargarMensajes()
+      void cargarConversacion()
     } catch (err) {
       setMensajes((actuales) =>
         actuales.map((actual) =>
@@ -343,6 +436,164 @@ export function ConversacionSolicitudTecnico({
     }
   }
 
+  function renderMensaje(mensaje: MensajeConversacion) {
+    const propio = mensaje.remitente.id === usuario?.id
+
+    return (
+      <div
+        key={`mensaje-${mensaje.id}`}
+        className={`flex ${propio ? 'justify-end' : 'justify-start'}`}
+      >
+        <article
+          className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm sm:max-w-[75%] ${
+            propio
+              ? 'rounded-br-sm bg-blue-600 text-white'
+              : 'rounded-bl-sm border border-panel bg-tarjeta text-texto'
+          }`}
+        >
+          {!propio && (
+            <p className="mb-1 text-xs font-bold text-accion">
+              {mensaje.remitente.nombre}
+            </p>
+          )}
+
+          <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
+            {mensaje.contenido}
+          </p>
+
+          {mensaje.adjuntos && mensaje.adjuntos.length > 0 && (
+            <div className="mt-3 space-y-3">
+              {mensaje.adjuntos.map((adjunto) => (
+                <div key={adjunto.id}>
+                  {adjunto.url ? (
+                    <a
+                      href={adjunto.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Abrir imagen"
+                      className="block overflow-hidden rounded-xl"
+                    >
+                      <img
+                        src={adjunto.url}
+                        alt={adjunto.nombre_archivo}
+                        loading="lazy"
+                        className="max-h-64 w-full rounded-xl object-contain"
+                      />
+                    </a>
+                  ) : (
+                    <p className="text-xs">
+                      No se pudo cargar la imagen: {adjunto.nombre_archivo}
+                    </p>
+                  )}
+
+                  <p
+                    className={`mt-1 break-all text-xs ${
+                      propio ? 'text-blue-100' : 'text-texto-secundario'
+                    }`}
+                  >
+                    {adjunto.nombre_archivo}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div
+            className={`mt-2 flex items-center justify-end gap-2 text-[11px] ${
+              propio ? 'text-blue-100' : 'text-texto-secundario'
+            }`}
+          >
+            <span>{formatearHora(mensaje.fecha_envio)}</span>
+
+            {propio && mensaje.estado_envio === 'enviando' && (
+              <span>Enviando...</span>
+            )}
+
+            {propio && mensaje.estado_envio === 'enviado' && (
+              <span>Enviado ✓</span>
+            )}
+
+            {propio && mensaje.estado_envio === 'error' && (
+              <button
+                type="button"
+                onClick={() => void reintentarMensaje(mensaje)}
+                className="font-bold underline"
+              >
+                Reintentar
+              </button>
+            )}
+          </div>
+        </article>
+      </div>
+    )
+  }
+
+  function renderPeticion(peticion: PeticionInformacion) {
+    const respondida = Boolean(peticion.respuesta)
+
+    return (
+      <div
+        key={`peticion-${peticion.id}`}
+        className="flex justify-end"
+      >
+        <article className="max-w-[85%] rounded-2xl rounded-br-sm border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm sm:max-w-[75%]">
+          <div className="mb-2 flex items-center gap-2">
+            <span className="text-sm">❓</span>
+            <p className="text-xs font-bold text-amber-800">
+              Solicitud de información enviada
+            </p>
+          </div>
+
+          <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">
+            {peticion.contenido}
+          </p>
+
+          <div className="mt-2 flex items-center justify-between gap-3">
+            <span className="text-[11px] text-slate-500">
+              {formatearHora(peticion.fecha_solicitud)}
+            </span>
+
+            <span
+              className={`rounded-full px-2 py-1 text-[10px] font-semibold ${
+                respondida
+                  ? 'bg-green-100 text-green-800'
+                  : 'bg-amber-100 text-amber-800'
+              }`}
+            >
+              {respondida ? 'Respondida' : 'Pendiente'}
+            </span>
+          </div>
+        </article>
+      </div>
+    )
+  }
+
+  function renderRespuesta(peticion: PeticionInformacion) {
+    if (!peticion.respuesta) return null
+
+    return (
+      <div
+        key={`respuesta-${peticion.respuesta.id}`}
+        className="flex justify-start"
+      >
+        <article className="max-w-[85%] rounded-2xl rounded-bl-sm border border-green-200 bg-green-50 px-4 py-3 shadow-sm sm:max-w-[75%]">
+          <p className="mb-1 text-xs font-bold text-green-800">
+            Respuesta del solicitante
+          </p>
+
+          <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">
+            {peticion.respuesta.contenido}
+          </p>
+
+          <div className="mt-2 flex items-center justify-end gap-2 text-[11px] text-slate-500">
+            <span>{formatearHora(peticion.respuesta.fecha_respuesta)}</span>
+            <span className="font-semibold text-green-700">Recibida ✓</span>
+          </div>
+        </article>
+      </div>
+    )
+  }
+
   return (
     <section className="overflow-hidden rounded-xl border border-panel bg-tarjeta shadow-sm">
       <header className="flex items-center justify-between gap-3 border-b border-panel px-5 py-4">
@@ -356,11 +607,10 @@ export function ConversacionSolicitudTecnico({
         </div>
 
         <span className="shrink-0 rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800">
-          {mensajes.length} mensajes
+          {eventos.length} elementos
         </span>
       </header>
 
-      {/* Solo esta zona tiene scroll y altura limitada */}
       <div
         ref={historialRef}
         className="h-[450px] max-h-[550px] space-y-4 overflow-y-auto overscroll-contain bg-fondo p-4 sm:p-5"
@@ -369,7 +619,7 @@ export function ConversacionSolicitudTecnico({
           <p className="py-10 text-center text-sm text-texto-secundario">
             Cargando conversación...
           </p>
-        ) : mensajes.length === 0 ? (
+        ) : eventos.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-tarjeta text-2xl text-texto-secundario">
               ☰
@@ -384,97 +634,27 @@ export function ConversacionSolicitudTecnico({
             </p>
           </div>
         ) : (
-          mensajes.map((mensaje) => {
-            const propio = mensaje.remitente.id === usuario?.id
+          <>
+            <p className="pb-1 text-center text-xs text-texto-secundario">
+              Historial de conversación
+            </p>
 
-            return (
-              <div
-                key={mensaje.id}
-                className={`flex ${propio ? 'justify-end' : 'justify-start'}`}
-              >
-                <article
-                  className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm sm:max-w-[75%] ${
-                    propio
-                      ? 'rounded-br-sm bg-blue-600 text-white'
-                      : 'rounded-bl-sm border border-panel bg-tarjeta text-texto'
-                  }`}
-                >
-                  {!propio && (
-                    <p className="mb-1 text-xs font-bold text-accion">
-                      {mensaje.remitente.nombre}
-                    </p>
-                  )}
+            {eventos.map((evento) => {
+              if (evento.tipo === 'mensaje' && evento.mensaje) {
+                return renderMensaje(evento.mensaje)
+              }
 
-                  <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
-                    {mensaje.contenido}
-                  </p>
+              if (evento.tipo === 'peticion' && evento.peticion) {
+                return renderPeticion(evento.peticion)
+              }
 
-                  {mensaje.adjuntos && mensaje.adjuntos.length > 0 && (
-                    <div className="mt-3 space-y-3">
-                      {mensaje.adjuntos.map((adjunto) => (
-                        <div key={adjunto.id}>
-                          {adjunto.url ? (
-                            <a
-                              href={adjunto.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              title="Abrir imagen"
-                              className="block overflow-hidden rounded-xl"
-                            >
-                              <img
-                                src={adjunto.url}
-                                alt={adjunto.nombre_archivo}
-                                loading="lazy"
-                                className="max-h-64 w-full rounded-xl object-contain"
-                              />
-                            </a>
-                          ) : (
-                            <p className="text-xs">
-                              No se pudo cargar la imagen: {adjunto.nombre_archivo}
-                            </p>
-                          )}
+              if (evento.tipo === 'respuesta' && evento.peticion) {
+                return renderRespuesta(evento.peticion)
+              }
 
-                          <p
-                            className={`mt-1 break-all text-xs ${
-                              propio ? 'text-blue-100' : 'text-texto-secundario'
-                            }`}
-                          >
-                            {adjunto.nombre_archivo}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <div
-                    className={`mt-2 flex items-center justify-end gap-2 text-[11px] ${
-                      propio ? 'text-blue-100' : 'text-texto-secundario'
-                    }`}
-                  >
-                    <span>{formatearHora(mensaje.fecha_envio)}</span>
-
-                    {propio && mensaje.estado_envio === 'enviando' && (
-                      <span>Enviando...</span>
-                    )}
-
-                    {propio && mensaje.estado_envio === 'enviado' && (
-                      <span>Enviado ✓</span>
-                    )}
-
-                    {propio && mensaje.estado_envio === 'error' && (
-                      <button
-                        type="button"
-                        onClick={() => void reintentarMensaje(mensaje)}
-                        className="font-bold underline"
-                      >
-                        Reintentar
-                      </button>
-                    )}
-                  </div>
-                </article>
-              </div>
-            )
-          })
+              return null
+            })}
+          </>
         )}
       </div>
 
