@@ -18,6 +18,12 @@ import { CambiarContrasenaPage } from '../pages/solicitante/CambiarContrasenaPag
 import { SolicitudesAsignadasPage } from '../pages/tecnico/SolicitudesAsignadasPage'
 import { DetalleSolicitudTecnicoPage } from '../pages/tecnico/DetalleSolicitudTecnicoPage'
 
+import { BandejaSolicitudesPage } from '../pages/coordinador/BandejaSolicitudesPage'
+import { DetalleSolicitudCoordinadorPage } from '../pages/coordinador/DetalleSolicitudCoordinadorPage'
+import { UsuariosPage } from '../pages/coordinador/UsuariosPage'
+import { CategoriasPage } from '../pages/coordinador/CategoriasPage'
+import { EstadisticasPage } from '../pages/coordinador/EstadisticasPage'
+
 import { RutaProtegida } from './RutaProtegida'
 
 function InicioSegunRol() {
@@ -38,40 +44,51 @@ function InicioSegunRol() {
   return <Navigate to="/coordinador" replace />
 }
 
-function ModuloPendiente() {
-  const { usuario } = useAuth()
-  const rol = usuario?.rol
+function PanelCoordinador() {
+  const ubicacion = useLocation()
 
-  const configuracion = {
-    tecnico: {
-      titulo: 'Panel del técnico',
-      ruta: '/tecnico',
-    },
-    coordinador: {
-      titulo: 'Panel del coordinador',
-      ruta: '/coordinador',
-    },
+  const titulos: Record<string, string> = {
+    '/coordinador': 'Bandeja de solicitudes',
+    '/coordinador/usuarios': 'Usuarios',
+    '/coordinador/categorias': 'Categorías',
+    '/coordinador/estadisticas': 'Estadísticas',
+    '/coordinador/perfil': 'Mi perfil',
+    '/coordinador/cambiar-contrasena': 'Cambiar contraseña',
   }
 
-  if (!rol || rol === 'solicitante') {
-    return null
-  }
-
-  const panel = configuracion[rol]
+  const esDetalle = ubicacion.pathname.startsWith('/coordinador/solicitud/')
 
   return (
     <PanelLayout
-      titulo={panel.titulo}
-      navegacion={[{ nombre: 'Inicio', ruta: panel.ruta }]}
+      titulo={
+        esDetalle
+          ? 'Gestión de solicitud'
+          : titulos[ubicacion.pathname] ?? 'Panel del coordinador'
+      }
+      navegacion={[
+        { nombre: 'Solicitudes', ruta: '/coordinador' },
+        { nombre: 'Usuarios', ruta: '/coordinador/usuarios' },
+        { nombre: 'Categorías', ruta: '/coordinador/categorias' },
+        { nombre: 'Estadísticas', ruta: '/coordinador/estadisticas' },
+        { nombre: 'Mi perfil', ruta: '/coordinador/perfil' },
+        { nombre: 'Cambiar contraseña', ruta: '/coordinador/cambiar-contrasena' },
+      ]}
     >
-      <section className="rounded-xl border border-panel bg-tarjeta p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-texto">
-          Bienvenido a SoporteTI
-        </h2>
-        <p className="mt-2 text-sm text-texto-secundario">
-          Aquí encontrarás las herramientas correspondientes a tu módulo.
-        </p>
-      </section>
+      <Routes>
+        <Route index element={<BandejaSolicitudesPage />} />
+        <Route
+          path="solicitud/:solicitudId"
+          element={<DetalleSolicitudCoordinadorPage />}
+        />
+        <Route path="usuarios" element={<UsuariosPage />} />
+        <Route path="categorias" element={<CategoriasPage />} />
+        <Route path="estadisticas" element={<EstadisticasPage />} />
+        <Route path="perfil" element={<PerfilSolicitantePage />} />
+        <Route
+          path="cambiar-contrasena"
+          element={<CambiarContrasenaPage />}
+        />
+      </Routes>
     </PanelLayout>
   )
 }
@@ -173,7 +190,7 @@ function RutasAplicacion() {
       <Route
         element={<RutaProtegida rolesPermitidos={['coordinador']} />}
       >
-        <Route path="/coordinador/*" element={<ModuloPendiente />} />
+        <Route path="/coordinador/*" element={<PanelCoordinador />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
