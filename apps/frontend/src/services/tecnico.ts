@@ -72,6 +72,33 @@ export interface AdjuntoIntervencionRespuesta {
   }
 }
 
+export interface AutorPeticionInformacion {
+  id: string
+  nombre: string
+  rol: string
+}
+
+export interface RespuestaInformacion {
+  id: string
+  solicitud_informacion_id: string
+  respondido_por: string
+  contenido: string
+  fecha_respuesta: string
+}
+
+export interface PeticionInformacion {
+  id: string
+  contenido: string
+  estado: string
+  solicitado_por: AutorPeticionInformacion
+  fecha_solicitud: string
+  respuesta: RespuestaInformacion | null
+}
+
+export interface PeticionesInformacionRespuesta {
+  data: PeticionInformacion[]
+}
+
 export async function consultarDetalleSolicitud(
   solicitudId: string,
 ): Promise<SolicitudDetalle> {
@@ -123,6 +150,14 @@ export async function solicitarInformacion(
       method: 'POST',
       datos: { contenido },
     },
+  )
+}
+
+export async function consultarPeticionesInformacion(
+  solicitudId: string,
+): Promise<PeticionesInformacionRespuesta> {
+  return api<PeticionesInformacionRespuesta>(
+    `/requests/${solicitudId}/information-requests`,
   )
 }
 

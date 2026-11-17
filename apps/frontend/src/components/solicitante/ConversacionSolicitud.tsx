@@ -46,6 +46,29 @@ interface MensajeEnviadoRespuesta {
   }
 }
 
+interface PeticionInformacion {
+  id: string
+  contenido: string
+  estado: string
+  solicitado_por: {
+    id: string
+    nombre: string
+    rol: string
+  }
+  fecha_solicitud: string
+  respuesta: {
+    id: string
+    solicitud_informacion_id: string
+    respondido_por: string
+    contenido: string
+    fecha_respuesta: string
+  } | null
+}
+
+interface PeticionesInformacionRespuesta {
+  data: PeticionInformacion[]
+}
+
 interface ConversacionSolicitudProps {
   solicitud: SolicitudResumen
   onCerrar: () => void
@@ -62,6 +85,17 @@ function formatearHora(fecha: string): string {
   }).format(valor)
 }
 
+function formatearFecha(fecha: string): string {
+  const valor = new Date(fecha)
+
+  if (Number.isNaN(valor.getTime())) return ''
+
+  return new Intl.DateTimeFormat('es-CO', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(valor)
+}
+
 export function ConversacionSolicitud({
   solicitud,
   onCerrar,
@@ -69,11 +103,20 @@ export function ConversacionSolicitud({
   const { usuario } = useAuth()
 
   const [mensajes, setMensajes] = useState<MensajeConversacion[]>([])
+  const [peticionesInformacion, setPeticionesInformacion] = useState<
+    PeticionInformacion[]
+  >([])
+
   const [texto, setTexto] = useState('')
   const [archivo, setArchivo] = useState<File | null>(null)
   const [cargando, setCargando] = useState(true)
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState('')
+
+  const [respuestas, setRespuestas] = useState<Record<string, string>>({})
+  const [peticionRespondiendo, setPeticionRespondiendo] = useState<
+    string | null
+  >(null)
 
   const historialRef = useRef<HTMLDivElement>(null)
   const campoRef = useRef<HTMLTextAreaElement>(null)
@@ -112,7 +155,6 @@ export function ConversacionSolicitud({
       )
 
       setMensajes(mensajesConAdjuntos)
-      setError('')
     } catch (err) {
       setError(
         err instanceof Error
@@ -124,8 +166,35 @@ export function ConversacionSolicitud({
     }
   }
 
+  async function cargarPeticionesInformacion() {
+    try {
+      const respuesta = await api<PeticionesInformacionRespuesta>(
+        `/requests/${solicitud.id}/information-requests`,
+      )
+
+      setPeticionesInformacion(respuesta.data)
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'No fue posible consultar las solicitudes de información.',
+      )
+    }
+  }
+
   useEffect(() => {
     void cargarMensajes()
+    void cargarPeticionesInformacion()
+
+    // Actualiza las peticiones periódicamente mientras el chat está abierto.
+    const intervalo = window.setInterval(() => {
+      void cargarPeticionesInformacion()
+    }, 15000)
+
+    return () => {
+      window.clearInterval(intervalo)
+    }
+
     // La conversación corresponde a una solicitud concreta.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [solicitud.id])
@@ -139,7 +208,7 @@ export function ConversacionSolicitud({
       top: historial.scrollHeight,
       behavior: 'smooth',
     })
-  }, [mensajes])
+  }, [mensajes, peticionesInformacion])
 
   useEffect(() => {
     if (!archivo) {
@@ -175,6 +244,45 @@ export function ConversacionSolicitud({
 
     if (archivoRef.current) {
       archivoRef.current.value = ''
+    }
+  }
+
+  async function enviarRespuestaInformacion(
+    evento: FormEvent<HTMLFormElement>,
+    peticion: PeticionInformacion,
+  ) {
+    evento.preventDefault()
+
+    const contenido = (respuestas[peticion.id] ?? '').trim()
+
+    if (!contenido || peticionRespondiendo) return
+
+    setPeticionRespondiendo(peticion.id)
+    setError('')
+
+    try {
+      await api<unknown>(
+        `/information-requests/${peticion.id}/responses`,
+        {
+          method: 'POST',
+          datos: { contenido },
+        },
+      )
+
+      setRespuestas((actuales) => ({
+        ...actuales,
+        [peticion.id]: '',
+      }))
+
+      await cargarPeticionesInformacion()
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'No fue posible enviar la respuesta.',
+      )
+    } finally {
+      setPeticionRespondiendo(null)
     }
   }
 
@@ -392,112 +500,235 @@ export function ConversacionSolicitud({
             <p className="py-10 text-center text-sm text-slate-500">
               Cargando conversación...
             </p>
-          ) : mensajes.length === 0 ? (
-            <div className="flex h-full flex-col items-center justify-center text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-2xl text-slate-400 shadow-sm">
-                ☰
-              </div>
-
-              <p className="mt-4 font-semibold text-slate-700">
-                Todavía no hay mensajes
-              </p>
-
-              <p className="mt-1 text-sm text-slate-500">
-                Escribe el primer mensaje para iniciar la conversación.
-              </p>
-            </div>
           ) : (
-            mensajes.map((mensaje) => {
-              const propio = mensaje.remitente.id === usuario?.id
+            <>
+              {mensajes.length === 0 && peticionesInformacion.length === 0 ? (
+                <div className="flex min-h-48 flex-col items-center justify-center text-center">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-2xl text-slate-400 shadow-sm">
+                    ☰
+                  </div>
 
-              return (
-                <div
-                  key={mensaje.id}
-                  className={`flex ${propio ? 'justify-end' : 'justify-start'}`}
-                >
-                  <article
-                    className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm sm:max-w-[70%] ${
-                      propio
-                        ? 'rounded-br-sm bg-blue-600 text-white'
-                        : 'rounded-bl-sm border border-slate-200 bg-white text-slate-800'
-                    }`}
-                  >
-                    {!propio && (
-                      <p className="mb-1 text-xs font-bold text-blue-700">
-                        {mensaje.remitente.nombre}
-                      </p>
-                    )}
+                  <p className="mt-4 font-semibold text-slate-700">
+                    Todavía no hay mensajes
+                  </p>
 
-                    <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
-                      {mensaje.contenido}
-                    </p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Escribe el primer mensaje para iniciar la conversación.
+                  </p>
+                </div>
+              ) : (
+                mensajes.map((mensaje) => {
+                  const propio = mensaje.remitente.id === usuario?.id
 
-                    {mensaje.adjuntos && mensaje.adjuntos.length > 0 && (
-                      <div className="mt-3 space-y-3">
-                        {mensaje.adjuntos.map((adjunto) => (
-                          <div key={adjunto.id}>
-                            {adjunto.url ? (
-                              <a
-                                href={adjunto.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                title="Abrir imagen en otra pestaña"
-                                className="block overflow-hidden rounded-xl"
-                              >
-                                <img
-                                  src={adjunto.url}
-                                  alt={adjunto.nombre_archivo}
-                                  loading="lazy"
-                                  className="max-h-80 w-full rounded-xl object-contain transition hover:opacity-90"
-                                />
-                              </a>
-                            ) : (
-                              <p className="text-xs">
-                                No se pudo cargar la imagen: {adjunto.nombre_archivo}
-                              </p>
-                            )}
+                  return (
+                    <div
+                      key={mensaje.id}
+                      className={`flex ${propio ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <article
+                        className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm sm:max-w-[70%] ${
+                          propio
+                            ? 'rounded-br-sm bg-blue-600 text-white'
+                            : 'rounded-bl-sm border border-slate-200 bg-white text-slate-800'
+                        }`}
+                      >
+                        {!propio && (
+                          <p className="mb-1 text-xs font-bold text-blue-700">
+                            {mensaje.remitente.nombre}
+                          </p>
+                        )}
 
-                            <p
-                              className={`mt-1 break-all text-xs ${
-                                propio ? 'text-blue-100' : 'text-slate-500'
-                              }`}
+                        <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
+                          {mensaje.contenido}
+                        </p>
+
+                        {mensaje.adjuntos && mensaje.adjuntos.length > 0 && (
+                          <div className="mt-3 space-y-3">
+                            {mensaje.adjuntos.map((adjunto) => (
+                              <div key={adjunto.id}>
+                                {adjunto.url ? (
+                                  <a
+                                    href={adjunto.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    title="Abrir imagen en otra pestaña"
+                                    className="block overflow-hidden rounded-xl"
+                                  >
+                                    <img
+                                      src={adjunto.url}
+                                      alt={adjunto.nombre_archivo}
+                                      loading="lazy"
+                                      className="max-h-80 w-full rounded-xl object-contain transition hover:opacity-90"
+                                    />
+                                  </a>
+                                ) : (
+                                  <p className="text-xs">
+                                    No se pudo cargar la imagen:{' '}
+                                    {adjunto.nombre_archivo}
+                                  </p>
+                                )}
+
+                                <p
+                                  className={`mt-1 break-all text-xs ${
+                                    propio ? 'text-blue-100' : 'text-slate-500'
+                                  }`}
+                                >
+                                  {adjunto.nombre_archivo}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        <div
+                          className={`mt-2 flex items-center justify-end gap-2 text-[11px] ${
+                            propio ? 'text-blue-100' : 'text-slate-400'
+                          }`}
+                        >
+                          <span>{formatearHora(mensaje.fecha_envio)}</span>
+
+                          {propio && mensaje.estado_envio === 'enviando' && (
+                            <span>Enviando...</span>
+                          )}
+
+                          {propio && mensaje.estado_envio === 'enviado' && (
+                            <span>Enviado ✓</span>
+                          )}
+
+                          {propio && mensaje.estado_envio === 'error' && (
+                            <button
+                              type="button"
+                              onClick={() => void reintentarMensaje(mensaje)}
+                              className="font-bold underline"
                             >
-                              {adjunto.nombre_archivo}
+                              Reintentar
+                            </button>
+                          )}
+                        </div>
+                      </article>
+                    </div>
+                  )
+                })
+              )}
+
+              {peticionesInformacion.map((peticion) => {
+                const respondida =
+                  peticion.estado.toLowerCase() === 'respondida' ||
+                  peticion.respuesta !== null
+
+                return (
+                  <div
+                    key={peticion.id}
+                    className="flex justify-start"
+                  >
+                    <article className="w-full max-w-[90%] rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm sm:max-w-[80%]">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-amber-800">
+                            ?
+                          </span>
+
+                          <div>
+                            <p className="text-sm font-bold text-amber-950">
+                              Solicitud de información
+                            </p>
+                            <p className="text-xs text-amber-800">
+                              {peticion.solicitado_por.nombre}
                             </p>
                           </div>
-                        ))}
-                      </div>
-                    )}
+                        </div>
 
-                    <div
-                      className={`mt-2 flex items-center justify-end gap-2 text-[11px] ${
-                        propio ? 'text-blue-100' : 'text-slate-400'
-                      }`}
-                    >
-                      <span>{formatearHora(mensaje.fecha_envio)}</span>
-
-                      {propio && mensaje.estado_envio === 'enviando' && (
-                        <span>Enviando...</span>
-                      )}
-
-                      {propio && mensaje.estado_envio === 'enviado' && (
-                        <span>Enviado ✓</span>
-                      )}
-
-                      {propio && mensaje.estado_envio === 'error' && (
-                        <button
-                          type="button"
-                          onClick={() => void reintentarMensaje(mensaje)}
-                          className="font-bold underline"
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                            respondida
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-amber-200 text-amber-900'
+                          }`}
                         >
-                          Reintentar
-                        </button>
+                          {respondida ? 'Respondida' : 'Pendiente'}
+                        </span>
+                      </div>
+
+                      <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-amber-950">
+                        {peticion.contenido}
+                      </p>
+
+                      <p className="mt-2 text-xs text-amber-800">
+                        Solicitada el {formatearFecha(peticion.fecha_solicitud)}
+                      </p>
+
+                      {peticion.respuesta ? (
+                        <div className="mt-4 rounded-xl border border-emerald-200 bg-white p-3">
+                          <p className="text-xs font-bold uppercase tracking-wide text-emerald-800">
+                            Tu respuesta
+                          </p>
+
+                          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
+                            {peticion.respuesta.contenido}
+                          </p>
+
+                          <p className="mt-2 text-xs text-slate-500">
+                            {formatearFecha(
+                              peticion.respuesta.fecha_respuesta,
+                            )}
+                          </p>
+                        </div>
+                      ) : !respondida && !cerrada ? (
+                        <form
+                          onSubmit={(evento) =>
+                            void enviarRespuestaInformacion(evento, peticion)
+                          }
+                          className="mt-4 space-y-3 border-t border-amber-200 pt-4"
+                        >
+                          <label
+                            htmlFor={`respuesta-${peticion.id}`}
+                            className="block text-sm font-semibold text-amber-950"
+                          >
+                            Escribe tu respuesta
+                          </label>
+
+                          <textarea
+                            id={`respuesta-${peticion.id}`}
+                            rows={3}
+                            maxLength={5000}
+                            required
+                            value={respuestas[peticion.id] ?? ''}
+                            onChange={(evento) =>
+                              setRespuestas((actuales) => ({
+                                ...actuales,
+                                [peticion.id]: evento.target.value,
+                              }))
+                            }
+                            placeholder="Escribe aquí la información solicitada..."
+                            disabled={peticionRespondiendo === peticion.id}
+                            className="w-full resize-y rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
+                          />
+
+                          <div className="flex justify-end">
+                            <button
+                              type="submit"
+                              disabled={
+                                !respuestas[peticion.id]?.trim() ||
+                                peticionRespondiendo !== null
+                              }
+                              className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {peticionRespondiendo === peticion.id
+                                ? 'Enviando respuesta...'
+                                : 'Enviar respuesta'}
+                            </button>
+                          </div>
+                        </form>
+                      ) : (
+                        <p className="mt-4 rounded-lg bg-white/70 p-3 text-sm text-slate-600">
+                          Esta solicitud ya no admite respuestas.
+                        </p>
                       )}
-                    </div>
-                  </article>
-                </div>
-              )
-            })
+                    </article>
+                  </div>
+                )
+              })}
+            </>
           )}
         </div>
 

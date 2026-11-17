@@ -5,12 +5,14 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Boton } from '../../components/Boton'
 import { Cargando } from '../../components/Cargando'
 import { MensajeEstado } from '../../components/MensajeEstado'
+import { ConversacionSolicitudTecnico } from '../../components/tecnico/ConversacionSolicitudTecnico'
 
 import {
   actualizarEstadoSolicitud,
   adjuntarImagenIntervencion,
   consultarDetalleSolicitud,
   consultarIntervenciones,
+  consultarPeticionesInformacion,
   registrarIntervencion,
   registrarSolucion,
   solicitarInformacion,
@@ -18,6 +20,7 @@ import {
 
 import type {
   Intervencion,
+  PeticionInformacion,
   SolicitudDetalle,
 } from '../../services/tecnico'
 
@@ -79,6 +82,7 @@ export function DetalleSolicitudTecnicoPage() {
 
   const [solicitud, setSolicitud] = useState<SolicitudDetalle | null>(null)
   const [intervenciones, setIntervenciones] = useState<Intervencion[]>([])
+  const [peticionesInformacion, setPeticionesInformacion] = useState<PeticionInformacion[]>([])
   const [cargando, setCargando] = useState(true)
   const [procesando, setProcesando] = useState(false)
   const [error, setError] = useState('')
@@ -99,13 +103,15 @@ export function DetalleSolicitudTecnicoPage() {
     setError('')
 
     try {
-      const [detalle, historial] = await Promise.all([
+      const [detalle, historial, peticiones] = await Promise.all([
         consultarDetalleSolicitud(solicitudId),
         consultarIntervenciones(solicitudId),
+        consultarPeticionesInformacion(solicitudId),
       ])
 
       setSolicitud(detalle)
       setIntervenciones(historial.data)
+      setPeticionesInformacion(peticiones.data)
     } catch (err) {
       setError(
         err instanceof Error
@@ -224,6 +230,7 @@ export function DetalleSolicitudTecnicoPage() {
 
       setSolicitudInformacion('')
       setMensaje('La solicitud de información se envió correctamente.')
+      await cargarDatos()
     } catch (err) {
       setError(
         err instanceof Error
@@ -385,46 +392,16 @@ export function DetalleSolicitudTecnicoPage() {
         </p>
 
         <div className="mt-6 grid gap-5 border-t border-panel pt-5 sm:grid-cols-2 lg:grid-cols-3">
-          <Campo
-            etiqueta="Solicitante"
-            valor={solicitud.solicitante?.nombre ?? ''}
-          />
-          <Campo
-            etiqueta="Categoría"
-            valor={solicitud.categoria?.nombre ?? 'Sin categoría'}
-          />
-          <Campo
-            etiqueta="Tipo"
-            valor={solicitud.tipo}
-          />
-          <Campo
-            etiqueta="Prioridad"
-            valor={solicitud.prioridad ?? 'No definida'}
-          />
-          <Campo
-            etiqueta="Ubicación"
-            valor={solicitud.ubicacion}
-          />
-          <Campo
-            etiqueta="Placa del equipo"
-            valor={solicitud.placa_equipo ?? 'No aplica'}
-          />
-          <Campo
-            etiqueta="Medio de contacto"
-            valor={solicitud.medio_contacto}
-          />
-          <Campo
-            etiqueta="Dato de contacto"
-            valor={solicitud.dato_contacto}
-          />
-          <Campo
-            etiqueta="Fecha de creación"
-            valor={formatearFecha(solicitud.fecha_creacion)}
-          />
-          <Campo
-            etiqueta="Técnico asignado"
-            valor={solicitud.tecnico_asignado?.nombre ?? 'Sin asignar'}
-          />
+          <Campo etiqueta="Solicitante" valor={solicitud.solicitante?.nombre ?? ''} />
+          <Campo etiqueta="Categoría" valor={solicitud.categoria?.nombre ?? 'Sin categoría'} />
+          <Campo etiqueta="Tipo" valor={solicitud.tipo} />
+          <Campo etiqueta="Prioridad" valor={solicitud.prioridad ?? 'No definida'} />
+          <Campo etiqueta="Ubicación" valor={solicitud.ubicacion} />
+          <Campo etiqueta="Placa del equipo" valor={solicitud.placa_equipo ?? 'No aplica'} />
+          <Campo etiqueta="Medio de contacto" valor={solicitud.medio_contacto} />
+          <Campo etiqueta="Dato de contacto" valor={solicitud.dato_contacto} />
+          <Campo etiqueta="Fecha de creación" valor={formatearFecha(solicitud.fecha_creacion)} />
+          <Campo etiqueta="Técnico asignado" valor={solicitud.tecnico_asignado?.nombre ?? 'Sin asignar'} />
         </div>
 
         {solicitud.solucion_final && (
@@ -450,15 +427,84 @@ export function DetalleSolicitudTecnicoPage() {
         )}
       </div>
 
+      <ConversacionSolicitudTecnico solicitud={solicitud} />
+
       <div className="rounded-xl border border-panel bg-tarjeta p-5 shadow-sm">
-        <div>
-          <h2 className="text-lg font-semibold text-texto">
-            Historial de intervenciones
-          </h2>
-          <p className="mt-1 text-sm text-texto-secundario">
-            Registro de las actividades realizadas sobre este caso.
+        <h2 className="text-lg font-semibold text-texto">
+          Solicitudes de información
+        </h2>
+        <p className="mt-1 text-sm text-texto-secundario">
+          Consulta las solicitudes enviadas al solicitante y sus respuestas.
+        </p>
+
+        {peticionesInformacion.length > 0 ? (
+          <div className="mt-5 space-y-4">
+            {peticionesInformacion.map((peticion) => (
+              <article
+                key={peticion.id}
+                className="rounded-lg border border-panel bg-fondo p-4"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-texto">
+                    Solicitud enviada por {peticion.solicitado_por.nombre}
+                  </p>
+
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                      peticion.estado === 'respondida'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-amber-100 text-amber-800'
+                    }`}
+                  >
+                    {peticion.estado === 'respondida'
+                      ? 'Respondida'
+                      : 'Pendiente de respuesta'}
+                  </span>
+                </div>
+
+                <p className="mt-1 text-xs text-texto-secundario">
+                  {formatearFecha(peticion.fecha_solicitud)}
+                </p>
+
+                <div className="mt-3">
+                  <p className="text-xs font-semibold uppercase text-texto-secundario">
+                    Información solicitada
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-texto">
+                    {peticion.contenido}
+                  </p>
+                </div>
+
+                {peticion.respuesta && (
+                  <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                    <p className="text-xs font-semibold uppercase text-emerald-800">
+                      Respuesta del solicitante
+                    </p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-emerald-900">
+                      {peticion.respuesta.contenido}
+                    </p>
+                    <p className="mt-2 text-xs text-emerald-800">
+                      {formatearFecha(peticion.respuesta.fecha_respuesta)}
+                    </p>
+                  </div>
+                )}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-5 rounded-lg bg-fondo p-5 text-center text-sm text-texto-secundario">
+            Todavía no has solicitado información para esta solicitud.
           </p>
-        </div>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-panel bg-tarjeta p-5 shadow-sm">
+        <h2 className="text-lg font-semibold text-texto">
+          Historial de intervenciones
+        </h2>
+        <p className="mt-1 text-sm text-texto-secundario">
+          Registro de las actividades realizadas sobre este caso.
+        </p>
 
         {intervenciones.length > 0 ? (
           <div className="mt-5 space-y-4">
@@ -524,15 +570,9 @@ export function DetalleSolicitudTecnicoPage() {
               Documenta el trabajo realizado en esta solicitud.
             </p>
 
-            <form
-              onSubmit={guardarIntervencion}
-              className="mt-5 space-y-4"
-            >
+            <form onSubmit={guardarIntervencion} className="mt-5 space-y-4">
               <div>
-                <label
-                  htmlFor="descripcion-intervencion"
-                  className="mb-1 block text-sm font-medium text-texto"
-                >
+                <label htmlFor="descripcion-intervencion" className="mb-1 block text-sm font-medium text-texto">
                   Descripción de la intervención
                 </label>
                 <textarea
@@ -547,10 +587,7 @@ export function DetalleSolicitudTecnicoPage() {
               </div>
 
               <div>
-                <label
-                  htmlFor="diagnostico-intervencion"
-                  className="mb-1 block text-sm font-medium text-texto"
-                >
+                <label htmlFor="diagnostico-intervencion" className="mb-1 block text-sm font-medium text-texto">
                   Diagnóstico (opcional)
                 </label>
                 <textarea
@@ -564,18 +601,13 @@ export function DetalleSolicitudTecnicoPage() {
               </div>
 
               <div>
-                <label
-                  htmlFor="visibilidad-intervencion"
-                  className="mb-1 block text-sm font-medium text-texto"
-                >
+                <label htmlFor="visibilidad-intervencion" className="mb-1 block text-sm font-medium text-texto">
                   Visibilidad
                 </label>
                 <select
                   id="visibilidad-intervencion"
                   value={visibilidad}
-                  onChange={(evento) =>
-                    setVisibilidad(evento.target.value as 'interna' | 'solicitante')
-                  }
+                  onChange={(evento) => setVisibilidad(evento.target.value as 'interna' | 'solicitante')}
                   className="w-full rounded-lg border border-panel bg-fondo px-3 py-2 text-sm text-texto outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
                 >
                   <option value="interna">Solo visible para el equipo técnico</option>
@@ -584,19 +616,14 @@ export function DetalleSolicitudTecnicoPage() {
               </div>
 
               <div>
-                <label
-                  htmlFor="imagen-intervencion"
-                  className="mb-1 block text-sm font-medium text-texto"
-                >
+                <label htmlFor="imagen-intervencion" className="mb-1 block text-sm font-medium text-texto">
                   Imagen de evidencia (opcional)
                 </label>
                 <input
                   id="imagen-intervencion"
                   type="file"
                   accept="image/*"
-                  onChange={(evento) =>
-                    setImagen(evento.target.files?.[0] ?? null)
-                  }
+                  onChange={(evento) => setImagen(evento.target.files?.[0] ?? null)}
                   className="block w-full rounded-lg border border-panel bg-fondo text-sm text-texto file:mr-4 file:border-0 file:bg-panel file:px-4 file:py-2.5 file:font-medium"
                 />
                 {imagen && (
@@ -622,27 +649,18 @@ export function DetalleSolicitudTecnicoPage() {
               Pide al solicitante los datos que hagan falta para continuar.
             </p>
 
-            <form
-              onSubmit={enviarSolicitudInformacion}
-              className="mt-4 space-y-3"
-            >
+            <form onSubmit={enviarSolicitudInformacion} className="mt-4 space-y-3">
               <textarea
                 required
                 rows={3}
                 value={solicitudInformacion}
-                onChange={(evento) =>
-                  setSolicitudInformacion(evento.target.value)
-                }
+                onChange={(evento) => setSolicitudInformacion(evento.target.value)}
                 placeholder="Escribe qué información necesitas..."
                 className="w-full rounded-lg border border-panel bg-fondo px-3 py-2 text-sm text-texto outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
               />
 
               <div className="flex justify-end">
-                <Boton
-                  type="submit"
-                  variante="secundario"
-                  disabled={procesando}
-                >
+                <Boton type="submit" variante="secundario" disabled={procesando}>
                   Enviar solicitud de información
                 </Boton>
               </div>
@@ -657,10 +675,7 @@ export function DetalleSolicitudTecnicoPage() {
               Registra la solución aplicada cuando el problema esté resuelto.
             </p>
 
-            <form
-              onSubmit={resolverSolicitud}
-              className="mt-4 space-y-3"
-            >
+            <form onSubmit={resolverSolicitud} className="mt-4 space-y-3">
               <textarea
                 required
                 rows={4}
