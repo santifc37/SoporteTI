@@ -1,7 +1,6 @@
 # Credenciales locales: nunca subir
 .env
 .env.local
-migrar_soporteti_a_local.ps1
 # Entorno virtual de Python
 venv/
 .venv/
@@ -9,5 +8,3 @@ venv/
 # Archivos generados por Python
 __pycache__/
 *.pyc
-# Archivos privados almacenados localmente
-storage/

@@ -348,24 +348,12 @@ def test_descargar_adjunto(
 
     adjunto_id = subida.json()["adjunto"]["id"]
 
-    class RespuestaStorage:
-        content = b"contenido-webp"
-
-        @staticmethod
-        def raise_for_status():
-            return None
-
     from app.services import adjuntos_solicitudes
 
     monkeypatch.setattr(
         adjuntos_solicitudes,
-        "_obtener_configuracion_storage",
-        lambda: ("https://ejemplo.supabase.co", "clave-prueba", "adjuntos"),
-    )
-    monkeypatch.setattr(
-        adjuntos_solicitudes.httpx,
-        "get",
-        lambda *args, **kwargs: RespuestaStorage(),
+        "leer_de_storage",
+        lambda ruta: b"contenido-webp",
     )
 
     respuesta = client.get(

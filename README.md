@@ -59,7 +59,7 @@ La solución utiliza una arquitectura cliente-servidor:
 | Frontend | React, TypeScript y Vite | Interfaz de usuario y consumo de la API. |
 | Backend | Python y FastAPI | API REST, reglas de negocio y autorización. |
 | Base de datos | PostgreSQL | Persistencia de usuarios, solicitudes y demás registros. |
-| Almacenamiento | Supabase Storage | Almacenamiento privado de archivos adjuntos. |
+| Almacenamiento | Disco local (`apps/backend/storage/`) | Almacenamiento privado de archivos adjuntos. |
 | ORM | SQLAlchemy | Acceso y persistencia de datos. |
 | Migraciones | Alembic | Evolución del esquema de base de datos. |
 | Pruebas | pytest | Validación automatizada del backend. |
@@ -79,6 +79,7 @@ SoporteTI/
 │   │   │   └── services/
 │   │   ├── alembic/
 │   │   ├── scripts/
+│   │   ├── storage/          # adjuntos locales (no se versiona)
 │   │   ├── tests/
 │   │   ├── .env.example
 │   │   └── requirements.txt
@@ -93,6 +94,8 @@ SoporteTI/
 └── README.md
 ```
 
+La carpeta `apps/backend/storage/` se crea automáticamente al subir el primer adjunto y está excluida de Git.
+
 ## 4. Configuración del entorno local
 
 El entorno de desarrollo local utiliza:
@@ -101,7 +104,9 @@ El entorno de desarrollo local utiliza:
 - Una base de datos local llamada `soporteti_local`.
 - FastAPI como servidor backend.
 - React y Vite como frontend.
-- Supabase Storage para los archivos adjuntos.
+- El disco local para los archivos adjuntos.
+
+No se requiere ninguna cuenta ni servicio externo.
 
 ### 4.1. Requisitos previos
 
@@ -109,8 +114,6 @@ El entorno de desarrollo local utiliza:
 - Python.
 - Node.js y npm.
 - PostgreSQL.
-- Acceso al proyecto de Supabase para utilizar su almacenamiento.
-- Bucket privado de Supabase Storage llamado `soporteti-adjuntos`.
 
 ### 4.2. Configuración de PostgreSQL
 
@@ -118,6 +121,12 @@ Crear una base de datos local llamada:
 
 ```text
 soporteti_local
+```
+
+Por ejemplo, desde PowerShell:
+
+```powershell
+psql -U postgres -c "CREATE DATABASE soporteti_local;"
 ```
 
 La conexión local utiliza PostgreSQL en `localhost`, puerto `5432`.
@@ -128,7 +137,7 @@ Ejemplo de conexión:
 postgresql+psycopg://postgres:CONTRASEÑA@localhost:5432/soporteti_local
 ```
 
-La contraseña debe corresponder a la configurada durante la instalación de PostgreSQL.
+La contraseña debe corresponder a la configurada durante la instalación de PostgreSQL. Si contiene caracteres especiales (`@`, `#`, `/`), deben escribirse codificados (por ejemplo, `@` como `%40`).
 
 ### 4.3. Configuración del backend
 
@@ -168,10 +177,6 @@ Editar `apps/backend/.env.local` y configurar las variables:
 ```env
 DATABASE_URL=postgresql+psycopg://postgres:CONTRASEÑA@localhost:5432/soporteti_local
 
-SUPABASE_URL=https://TU_PROJECT_REF.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=TU_SERVICE_ROLE_KEY
-SUPABASE_STORAGE_BUCKET=soporteti-adjuntos
-
 SESSION_DURATION_HOURS=8
 SESSION_COOKIE_SECURE=false
 SESSION_COOKIE_SAMESITE=lax
@@ -179,13 +184,12 @@ SESSION_COOKIE_SAMESITE=lax
 CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
 
-Las variables de Supabase se conservan para acceder al almacenamiento de archivos. La conexión `DATABASE_URL` apunta a PostgreSQL local.
+La conexión `DATABASE_URL` apunta a PostgreSQL local. Los archivos adjuntos se guardan en `apps/backend/storage/`, por lo que no se necesitan variables adicionales para el almacenamiento.
 
 **Importante:**
 
 - El archivo `.env.local` contiene información privada y no debe subirse al repositorio.
-- No exponer `SUPABASE_SERVICE_ROLE_KEY` en el frontend.
-- Mantener privado el bucket de adjuntos.
+- La carpeta `apps/backend/storage/` contiene archivos privados y no debe subirse al repositorio (ya está en `.gitignore`).
 - Utilizar datos ficticios en las demostraciones.
 
 ### 4.4. Selección del entorno local
@@ -350,7 +354,7 @@ Los permisos de cada operación dependen del rol autenticado y de las reglas def
 
 ## 8. Archivos adjuntos
 
-Los adjuntos se procesan desde el backend y se almacenan en Supabase Storage. Sus metadatos y relaciones se conservan en PostgreSQL.
+Los adjuntos se procesan desde el backend y se almacenan en el disco local, dentro de `apps/backend/storage/`. Sus metadatos y relaciones se conservan en PostgreSQL.
 
 El procesamiento de imágenes contempla:
 
@@ -358,11 +362,26 @@ El procesamiento de imágenes contempla:
 - Conversión a formato WebP.
 - Corrección de orientación cuando existe información EXIF.
 - Redimensionamiento de imágenes cuando es necesario.
-- Almacenamiento privado.
+- Almacenamiento privado en disco local.
 - Registro de metadatos en PostgreSQL.
 - Validación de permisos y estado de la solicitud.
 
 Los adjuntos pueden asociarse a solicitudes, mensajes o intervenciones, según la operación utilizada.
+
+### Descarga de adjuntos
+
+Los archivos no se exponen públicamente. Las respuestas de la API incluyen, en el campo `url`, una ruta relativa al endpoint autenticado:
+
+```text
+/api/v1/attachments/{id}/download
+```
+
+Antes de entregar el archivo, el backend valida la sesión del usuario y sus permisos sobre la solicitud, el mensaje o la intervención a la que pertenece el adjunto. Por esta razón, la descarga debe realizarse con la sesión activa del usuario.
+
+### Consideraciones
+
+- `apps/backend/storage/` no se versiona; para conservar los adjuntos debe incluirse en las copias de seguridad del equipo o servidor.
+- Los adjuntos que se hayan guardado anteriormente en Supabase Storage no se migran automáticamente. Para conservarlos, deben copiarse a `apps/backend/storage/` respetando la ruta registrada en la base de datos (`ruta_storage`).
 
 ## 9. Pruebas y evidencias
 
@@ -388,7 +407,7 @@ Los archivos de pruebas se encuentran en:
 apps/backend/tests/
 ```
 
-Las pruebas automatizadas permiten validar los diferentes módulos y reglas de negocio implementados en el backend.
+Las pruebas automatizadas permiten validar los diferentes módulos y reglas de negocio implementados en el backend. Utilizan SQLite en memoria y simulan la lectura y escritura de adjuntos, por lo que no requieren PostgreSQL ni archivos reales en `storage/`.
 
 ### 9.2. Pruebas funcionales del proyecto
 
@@ -427,13 +446,11 @@ Los cambios deben respetar los requisitos, el diseño, el modelo de datos y el c
 
 ## 11. Estado del entorno y consideraciones
 
-El entorno local permite ejecutar el backend y el frontend utilizando PostgreSQL instalado en el equipo, sin depender de una conexión a una base de datos PostgreSQL alojada en Supabase.
+El entorno local permite ejecutar el backend y el frontend utilizando únicamente PostgreSQL y el disco del equipo, sin depender de servicios externos como Supabase.
 
-Supabase Storage continúa siendo utilizado para el almacenamiento de archivos adjuntos.
+Los archivos de configuración locales (`.env.local`) y la carpeta `apps/backend/storage/` no deben incluirse en los commits.
 
-Los archivos de configuración locales (`.env.local`) no deben incluirse en los commits.
-
-El despliegue en producción y sus variables de entorno deben configurarse de manera independiente al entorno local.
+El despliegue en producción y sus variables de entorno deben configurarse de manera independiente al entorno local. En un despliegue, el directorio `storage/` debe residir en un volumen persistente y respaldado.
 
 El alcance no contempla notificaciones externas por correo, SMS o WhatsApp, ni comunicación en tiempo real mediante WebSockets.
 

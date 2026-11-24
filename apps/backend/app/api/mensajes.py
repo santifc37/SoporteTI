@@ -7,6 +7,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.orm import Session
 
+from app.services.adjuntos import ErrorStorage
 from app.api.dependencies import UsuarioActual, get_current_user
 from app.core.errors import ApiError
 from app.database.session import get_db
