@@ -158,7 +158,7 @@ La autenticación se realizará mediante sesiones gestionadas por el backend.
 
 Se utilizará una cookie protegida para identificar al usuario autenticado.
 
-El frontend no deberá almacenar contraseñas, tokens de sesión ni credenciales administrativas de Supabase.
+El frontend no deberá almacenar contraseñas, tokens de sesión ni credenciales de conexión a la base de datos o de infraestructura del backend.
 
 ### 4.1. Iniciar sesión
 
@@ -1797,6 +1797,8 @@ Los técnicos pueden adjuntar imágenes a sus intervenciones.
 
 Las imágenes de solicitudes, mensajes e intervenciones utilizan el mismo proceso de validación, conversión a WebP y almacenamiento local.
 
+---
+
 ## 16. Estadísticas
 
 ### 16.1. Consultar estadísticas
@@ -1960,7 +1962,7 @@ Se utilizarán códigos descriptivos para identificar los errores más frecuente
 | `TECNICO_NO_VALIDO` | El técnico no existe o está inactivo. |
 | `PETICION_YA_RESPONDIDA` | La petición de información ya tiene respuesta. |
 | `ARCHIVO_NO_VALIDO` | El archivo no corresponde a un formato permitido. |
-| `ARCHIVO_DEMASIADO_GRANDE` | El archivo supera los 5 MB. |
+| `ARCHIVO_DEMASIADO_GRANDE` | El archivo supera los 10 MB. |
 | `CONFLICTO_CONCURRENCIA` | La solicitud fue modificada por otra operación simultánea. |
 
 Los mensajes de error no deberán revelar contraseñas, hashes, claves privadas, rutas internas ni detalles técnicos sensibles.
@@ -1996,9 +1998,10 @@ Las siguientes condiciones serán obligatorias:
 - Los permisos se validarán en el backend.
 - Las contraseñas se almacenarán mediante hash seguro.
 - Las cookies de sesión utilizarán los atributos de seguridad definidos en el diseño.
-- Las credenciales de Supabase permanecerán exclusivamente en el backend.
+- Las credenciales de conexión a PostgreSQL y demás variables privadas de infraestructura permanecerán exclusivamente en el backend y en la configuración segura del entorno.
 - Las operaciones que utilicen cookies deberán aplicar protección CSRF cuando corresponda.
-- Los archivos se almacenarán en un bucket privado.
+- Los archivos se almacenarán en el sistema de archivos local del backend, dentro de `apps/backend/storage/`, y no tendrán acceso público directo.
+- La descarga de archivos se realizará mediante endpoints autenticados que validen los permisos del usuario sobre el recurso asociado.
 - Las solicitudes cerradas serán de solo consulta.
 - Los errores no expondrán información sensible.
 - Las operaciones importantes quedarán registradas en el historial.

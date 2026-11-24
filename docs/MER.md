@@ -132,8 +132,8 @@ erDiagram
         UUID subido_por FK
         VARCHAR nombre_archivo
         VARCHAR ruta_storage UK
-        VARCHAR tipo_archivo "image/png | image/jpeg"
-        BIGINT tamano "bytes, max 5242880"
+        VARCHAR tipo_archivo "image/webp"
+        BIGINT tamano "bytes del archivo almacenado"
         TIMESTAMPTZ fecha_subida
     }
 
@@ -301,8 +301,9 @@ Una clave foránea no puede verificar el rol del usuario ni el estado de la soli
 - Si el medio preferido es `telefono`, el campo `telefono` es obligatorio.
 
 **Adjuntos**
-- Solo se aceptan archivos `image/png` o `image/jpeg`.
-- El tamaño es mayor que 0 y no supera 5 MB (5 242 880 bytes).
+- Se aceptan imágenes reconocidas por Pillow, incluyendo HEIC/HEIF mediante `pillow-heif`.
+- El archivo original debe tener un tamaño mayor que 0 y no superar 10 MB (10 485 760 bytes).
+- Las imágenes se convierten a formato WebP antes de almacenarse.
 
 **Historial**
 - `historial_cambios.tipo_cambio` solo toma los valores definidos en el diagrama (`creacion`, `cambio_estado`, `cambio_prioridad`, `cambio_categoria`, `asignacion`, `reasignacion`, `solucion`, `cierre_solucion`, `cierre_administrativo`, `cancelacion`).

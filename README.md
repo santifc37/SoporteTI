@@ -1,101 +1,101 @@
-# SoporteTI
+﻿# SoporteTI
 
-Sistema web para la gestiÃ³n de solicitudes de soporte de tecnologÃ­as de la informaciÃ³n. Permite registrar, evaluar, clasificar, asignar y atender solicitudes, mantener la comunicaciÃ³n entre los participantes y conservar la trazabilidad de cada caso.
+Sistema web para la gestión de solicitudes de soporte de tecnologías de la información. Permite registrar, evaluar, clasificar, asignar y atender solicitudes, mantener la comunicación entre los participantes y conservar la trazabilidad de cada caso.
 
 **Asignatura:** Aplicaciones y Servicios Web  
-**InstituciÃ³n:** Instituto TecnolÃ³gico Metropolitano (ITM)  
+**Institución:** Instituto Tecnológico Metropolitano (ITM)  
 **Repositorio:** https://github.com/santifc37/SoporteTI
 
 ---
 
-## 1. DescripciÃ³n del sistema
+## 1. Descripción del sistema
 
-SoporteTI busca centralizar el proceso de atenciÃ³n de incidentes y solicitudes de soporte tecnolÃ³gico de una instituciÃ³n.
+SoporteTI busca centralizar el proceso de atención de incidentes y solicitudes de soporte tecnológico de una institución.
 
 El sistema contempla tres roles:
 
-- **Solicitante:** registra solicitudes, consulta su estado, participa en conversaciones, responde peticiones de informaciÃ³n y consulta el resultado de la atenciÃ³n.
-- **TÃ©cnico:** consulta sus solicitudes asignadas, registra intervenciones, solicita informaciÃ³n adicional y documenta las soluciones.
-- **Coordinador:** administra usuarios y categorÃ­as, evalÃºa solicitudes, asigna tÃ©cnicos, supervisa la atenciÃ³n, revisa soluciones, cierra solicitudes y consulta estadÃ­sticas.
+- **Solicitante:** registra solicitudes, consulta su estado, participa en conversaciones, responde peticiones de información y consulta el resultado de la atención.
+- **Técnico:** consulta sus solicitudes asignadas, registra intervenciones, solicita información adicional y documenta las soluciones.
+- **Coordinador:** administra usuarios y categorías, evalúa solicitudes, asigna técnicos, supervisa la atención, revisa soluciones, cierra solicitudes y consulta estadísticas.
 
-El backend aplica controles de acceso para restringir las operaciones segÃºn el rol y la relaciÃ³n del usuario con cada solicitud.
+El backend aplica controles de acceso para restringir las operaciones según el rol y la relación del usuario con cada solicitud.
 
 ## 2. Alcance y requisitos
 
 El proyecto contempla:
 
-- AutenticaciÃ³n y control de acceso por roles.
-- AdministraciÃ³n de usuarios y datos de contacto.
+- Autenticación y control de acceso por roles.
+- Administración de usuarios y datos de contacto.
 - Registro y consulta de solicitudes.
-- EvaluaciÃ³n, clasificaciÃ³n y asignaciÃ³n de solicitudes.
-- ActualizaciÃ³n controlada de estados.
-- Registro y consulta de intervenciones tÃ©cnicas.
-- Solicitud y respuesta de informaciÃ³n adicional.
+- Evaluación, clasificación y asignación de solicitudes.
+- Actualización controlada de estados.
+- Registro y consulta de intervenciones técnicas.
+- Solicitud y respuesta de información adicional.
 - Registro de soluciones y cierre de solicitudes.
 - Conversaciones y mensajes asociados a solicitudes.
 - Adjuntos en solicitudes, mensajes e intervenciones.
 - Notificaciones internas.
 - Historial de cambios.
-- EstadÃ­sticas para coordinaciÃ³n.
+- Estadísticas para coordinación.
 
-No se incluyen notificaciones por correo, SMS o WhatsApp, chat mediante WebSockets ni recuperaciÃ³n automÃ¡tica de contraseÃ±as mediante servicios externos.
+No se incluyen notificaciones por correo, SMS o WhatsApp, chat mediante WebSockets ni recuperación automática de contraseñas mediante servicios externos.
 
-### DocumentaciÃ³n
+### Documentación
 
 - [Requisitos funcionales y no funcionales](docs/requisitos.md).
-- [DiseÃ±o de la soluciÃ³n](docs/diseno.md).
+- [Diseño de la solución](docs/diseno.md).
 - [Contrato de la API](docs/contrato-api.md).
-- [GuÃ­a de desarrollo](docs/guia-desarrollo.md).
+- [Guía de desarrollo](docs/guia-desarrollo.md).
 - [Matriz de trazabilidad](docs/trazabilidad.md).
-- [Modelo entidad-relaciÃ³n](docs/MER.md).
+- [Modelo entidad-relación](docs/MER.md).
 
-## 3. Arquitectura y tecnologÃ­as
+## 3. Arquitectura y tecnologías
 
-La soluciÃ³n utiliza una arquitectura cliente-servidor:
+La solución utiliza una arquitectura cliente-servidor:
 
-| Componente | TecnologÃ­a | Responsabilidad |
+| Componente | Tecnología | Responsabilidad |
 |---|---|---|
 | Frontend | React, TypeScript y Vite | Interfaz de usuario y consumo de la API. |
-| Backend | Python y FastAPI | API REST, reglas de negocio y autorizaciÃ³n. |
-| Base de datos | PostgreSQL | Persistencia de usuarios, solicitudes y demÃ¡s registros. |
+| Backend | Python y FastAPI | API REST, reglas de negocio y autorización. |
+| Base de datos | PostgreSQL | Persistencia de usuarios, solicitudes y demás registros. |
 | Almacenamiento | Disco local (`apps/backend/storage/`) | Almacenamiento privado de archivos adjuntos. |
 | ORM | SQLAlchemy | Acceso y persistencia de datos. |
-| Migraciones | Alembic | EvoluciÃ³n del esquema de base de datos. |
-| Pruebas | pytest | ValidaciÃ³n automatizada del backend. |
+| Migraciones | Alembic | Evolución del esquema de base de datos. |
+| Pruebas | pytest | Validación automatizada del backend. |
 
 ### Estructura principal
 
 ```text
 SoporteTI/
-â”œâ”€â”€ apps/
-â”‚   â”œâ”€â”€ backend/
-â”‚   â”‚   â”œâ”€â”€ app/
-â”‚   â”‚   â”‚   â”œâ”€â”€ api/
-â”‚   â”‚   â”‚   â”œâ”€â”€ core/
-â”‚   â”‚   â”‚   â”œâ”€â”€ database/
-â”‚   â”‚   â”‚   â”œâ”€â”€ models/
-â”‚   â”‚   â”‚   â”œâ”€â”€ schemas/
-â”‚   â”‚   â”‚   â””â”€â”€ services/
-â”‚   â”‚   â”œâ”€â”€ alembic/
-â”‚   â”‚   â”œâ”€â”€ scripts/
-â”‚   â”‚   â”œâ”€â”€ storage/          # adjuntos locales (no se versiona)
-â”‚   â”‚   â”œâ”€â”€ tests/
-â”‚   â”‚   â”œâ”€â”€ .env.example
-â”‚   â”‚   â””â”€â”€ requirements.txt
-â”‚   â””â”€â”€ frontend/
-â”‚       â”œâ”€â”€ src/
-â”‚       â”œâ”€â”€ public/
-â”‚       â”œâ”€â”€ package.json
-â”‚       â””â”€â”€ vite.config.ts
-â”œâ”€â”€ docs/
-â”œâ”€â”€ evidencias/
-â”œâ”€â”€ proyecto2.md
-â””â”€â”€ README.md
+├── apps/
+│   ├── backend/
+│   │   ├── app/
+│   │   │   ├── api/
+│   │   │   ├── core/
+│   │   │   ├── database/
+│   │   │   ├── models/
+│   │   │   ├── schemas/
+│   │   │   └── services/
+│   │   ├── alembic/
+│   │   ├── scripts/
+│   │   ├── storage/          # adjuntos locales (no se versiona)
+│   │   ├── tests/
+│   │   ├── .env.example
+│   │   └── requirements.txt
+│   └── frontend/
+│       ├── src/
+│       ├── public/
+│       ├── package.json
+│       └── vite.config.ts
+├── docs/
+├── evidencias/
+├── proyecto2.md
+└── README.md
 ```
 
-La carpeta `apps/backend/storage/` se crea automÃ¡ticamente al subir el primer adjunto y estÃ¡ excluida de Git.
+La carpeta `apps/backend/storage/` se crea automáticamente al subir el primer adjunto y está excluida de Git.
 
-## 4. ConfiguraciÃ³n del entorno local
+## 4. Configuración del entorno local
 
 El entorno de desarrollo local utiliza:
 
@@ -114,7 +114,7 @@ No se requiere ninguna cuenta ni servicio externo.
 - Node.js y npm.
 - PostgreSQL.
 
-### 4.2. ConfiguraciÃ³n de PostgreSQL
+### 4.2. Configuración de PostgreSQL
 
 Crear una base de datos local llamada:
 
@@ -128,19 +128,19 @@ Por ejemplo, desde PowerShell:
 psql -U postgres -c "CREATE DATABASE soporteti_local;"
 ```
 
-La conexiÃ³n local utiliza PostgreSQL en `localhost`, puerto `5432`.
+La conexión local utiliza PostgreSQL en `localhost`, puerto `5432`.
 
-Ejemplo de conexiÃ³n:
+Ejemplo de conexión:
 
 ```text
-postgresql+psycopg://postgres:CONTRASEÃ‘A@localhost:5432/soporteti_local
+postgresql+psycopg://postgres:CONTRASEÑA@localhost:5432/soporteti_local
 ```
 
-La contraseÃ±a debe corresponder a la configurada durante la instalaciÃ³n de PostgreSQL. Si contiene caracteres especiales (`@`, `#`, `/`), deben escribirse codificados (por ejemplo, `@` como `%40`).
+La contraseña debe corresponder a la configurada durante la instalación de PostgreSQL. Si contiene caracteres especiales (`@`, `#`, `/`), deben escribirse codificados (por ejemplo, `@` como `%40`).
 
-### 4.3. ConfiguraciÃ³n del backend
+### 4.3. Configuración del backend
 
-Desde la raÃ­z del repositorio:
+Desde la raíz del repositorio:
 
 ```powershell
 cd apps/backend
@@ -165,7 +165,7 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-Crear el archivo de configuraciÃ³n local a partir del ejemplo:
+Crear el archivo de configuración local a partir del ejemplo:
 
 ```powershell
 Copy-Item .env.example .env.local
@@ -174,7 +174,7 @@ Copy-Item .env.example .env.local
 Editar `apps/backend/.env.local` y configurar las variables:
 
 ```env
-DATABASE_URL=postgresql+psycopg://postgres:CONTRASEÃ‘A@localhost:5432/soporteti_local
+DATABASE_URL=postgresql+psycopg://postgres:CONTRASEÑA@localhost:5432/soporteti_local
 
 SESSION_DURATION_HOURS=8
 SESSION_COOKIE_SECURE=false
@@ -183,17 +183,17 @@ SESSION_COOKIE_SAMESITE=lax
 CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
 
-La conexiÃ³n `DATABASE_URL` apunta a PostgreSQL local. Los archivos adjuntos se guardan en `apps/backend/storage/`, por lo que no se necesitan variables adicionales para el almacenamiento.
+La conexión `DATABASE_URL` apunta a PostgreSQL local. Los archivos adjuntos se guardan en `apps/backend/storage/`, por lo que no se necesitan variables adicionales para el almacenamiento.
 
 **Importante:**
 
-- El archivo `.env.local` contiene informaciÃ³n privada y no debe subirse al repositorio.
-- La carpeta `apps/backend/storage/` contiene archivos privados y no debe subirse al repositorio (ya estÃ¡ en `.gitignore`).
+- El archivo `.env.local` contiene información privada y no debe subirse al repositorio.
+- La carpeta `apps/backend/storage/` contiene archivos privados y no debe subirse al repositorio (ya está en `.gitignore`).
 - Utilizar datos ficticios en las demostraciones.
 
-### 4.4. SelecciÃ³n del entorno local
+### 4.4. Selección del entorno local
 
-El backend utiliza la variable `APP_ENV` para seleccionar el archivo de configuraciÃ³n:
+El backend utiliza la variable `APP_ENV` para seleccionar el archivo de configuración:
 
 | Valor | Archivo utilizado |
 |---|---|
@@ -222,7 +222,7 @@ Las migraciones se encuentran en:
 apps/backend/alembic/versions/
 ```
 
-Este comando crea o actualiza las tablas de la base de datos local segÃºn las migraciones disponibles.
+Este comando crea o actualiza las tablas de la base de datos local según las migraciones disponibles.
 
 ### 4.6. Ejecutar el backend
 
@@ -233,19 +233,19 @@ $env:APP_ENV = "local"
 uvicorn app.main:app --reload
 ```
 
-La API estarÃ¡ disponible en:
+La API estará disponible en:
 
 ```text
 http://127.0.0.1:8000
 ```
 
-La documentaciÃ³n interactiva de Swagger estarÃ¡ disponible en:
+La documentación interactiva de Swagger estará disponible en:
 
 ```text
 http://127.0.0.1:8000/docs
 ```
 
-## 5. ConfiguraciÃ³n del frontend
+## 5. Configuración del frontend
 
 Abrir una segunda terminal de PowerShell y ubicarse en:
 
@@ -267,15 +267,15 @@ VITE_API_URL=/api/v1
 "@ | Set-Content .env.local
 ```
 
-El frontend utiliza `VITE_API_URL` para determinar la direcciÃ³n de la API.
+El frontend utiliza `VITE_API_URL` para determinar la dirección de la API.
 
-La configuraciÃ³n de Vite utiliza un proxy local que redirige las solicitudes `/api` hacia:
+La configuración de Vite utiliza un proxy local que redirige las solicitudes `/api` hacia:
 
 ```text
 http://127.0.0.1:8000
 ```
 
-Por esta razÃ³n, el frontend puede comunicarse con el backend sin configurar una direcciÃ³n externa durante el desarrollo local.
+Por esta razón, el frontend puede comunicarse con el backend sin configurar una dirección externa durante el desarrollo local.
 
 ### Ejecutar el frontend
 
@@ -285,15 +285,15 @@ Desde `apps/frontend`:
 npm run dev
 ```
 
-La interfaz estarÃ¡ disponible en:
+La interfaz estará disponible en:
 
 ```text
 http://localhost:5173
 ```
 
-Para utilizar el sistema local deben estar ejecutÃ¡ndose simultÃ¡neamente el backend y el frontend.
+Para utilizar el sistema local deben estar ejecutándose simultáneamente el backend y el frontend.
 
-## 6. CreaciÃ³n de usuarios locales
+## 6. Creación de usuarios locales
 
 El proyecto dispone de un script para crear usuarios directamente en la base de datos seleccionada.
 
@@ -303,33 +303,31 @@ Desde `apps/backend`, con el entorno virtual activado:
 $env:APP_ENV = "local"
 ```
 
-Ejemplo de creaciÃ³n de un usuario coordinador:
+Ejemplo de creación de un usuario coordinador:
 
 ```powershell
 python -m scripts.crear_usuario Admin Local coordinador@coordinador.com coordinador
 ```
 
-Ejemplo de creaciÃ³n de un tÃ©cnico:
+Ejemplo de creación de un técnico:
 
 ```powershell
 python -m scripts.crear_usuario Tecnico Local tecnico@tecnico.com tecnico
 ```
 
-Ejemplo de creaciÃ³n de un solicitante:
+Ejemplo de creación de un solicitante:
 
 ```powershell
 python -m scripts.crear_usuario Solicitante Local solicitante@solicitante.com solicitante
 ```
 
-El script solicita la contraseÃ±a de forma interactiva y la almacena utilizando el mecanismo de hash definido por el backend.
+El script solicita la contraseña de forma interactiva y la almacena utilizando el mecanismo de hash definido por el backend.
 
 Los roles disponibles son:
 
 - `solicitante`
 - `tecnico`
 - `coordinador`
-
-Los usuarios se crean mediante el script 'apps/backend/scripts/crear_usuario.py'. Consulta la secciÃ³n de creaciÃ³n de usuarios de esta guÃ­a.
 
 ## 7. Servicios web y API
 
@@ -339,48 +337,48 @@ La API utiliza el prefijo:
 /api/v1
 ```
 
-La documentaciÃ³n interactiva de los servicios se puede consultar desde Swagger:
+La documentación interactiva de los servicios se puede consultar desde Swagger:
 
 ```text
 http://127.0.0.1:8000/docs
 ```
 
-La especificaciÃ³n de rutas, mÃ©todos HTTP, parÃ¡metros, cuerpos de peticiÃ³n, respuestas, permisos y errores se encuentra en:
+La especificación de rutas, métodos HTTP, parámetros, cuerpos de petición, respuestas, permisos y errores se encuentra en:
 
 [docs/contrato-api.md](docs/contrato-api.md).
 
-Los permisos de cada operaciÃ³n dependen del rol autenticado y de las reglas definidas para cada solicitud.
+Los permisos de cada operación dependen del rol autenticado y de las reglas definidas para cada solicitud.
 
 ## 8. Archivos adjuntos
 
 Los adjuntos se procesan desde el backend y se almacenan en el disco local, dentro de `apps/backend/storage/`. Sus metadatos y relaciones se conservan en PostgreSQL.
 
-El procesamiento de imÃ¡genes contempla:
+El procesamiento de imágenes contempla:
 
-- ValidaciÃ³n del contenido real del archivo.
-- ConversiÃ³n a formato WebP.
-- CorrecciÃ³n de orientaciÃ³n cuando existe informaciÃ³n EXIF.
-- Redimensionamiento de imÃ¡genes cuando es necesario.
+- Validación del contenido real del archivo.
+- Conversión a formato WebP.
+- Corrección de orientación cuando existe información EXIF.
+- Redimensionamiento de imágenes cuando es necesario.
 - Almacenamiento privado en disco local.
 - Registro de metadatos en PostgreSQL.
-- ValidaciÃ³n de permisos y estado de la solicitud.
+- Validación de permisos y estado de la solicitud.
 
-Los adjuntos pueden asociarse a solicitudes, mensajes o intervenciones, segÃºn la operaciÃ³n utilizada.
+Los adjuntos pueden asociarse a solicitudes, mensajes o intervenciones, según la operación utilizada.
 
 ### Descarga de adjuntos
 
-Los archivos no se exponen pÃºblicamente. Las respuestas de la API incluyen, en el campo `url`, una ruta relativa al endpoint autenticado:
+Los archivos no se exponen públicamente. Las respuestas de la API incluyen, en el campo `url`, una ruta relativa al endpoint autenticado:
 
 ```text
 /api/v1/attachments/{id}/download
 ```
 
-Antes de entregar el archivo, el backend valida la sesiÃ³n del usuario y sus permisos sobre la solicitud, el mensaje o la intervenciÃ³n a la que pertenece el adjunto. Por esta razÃ³n, la descarga debe realizarse con la sesiÃ³n activa del usuario.
+Antes de entregar el archivo, el backend valida la sesión del usuario y sus permisos sobre la solicitud, el mensaje o la intervención a la que pertenece el adjunto. Por esta razón, la descarga debe realizarse con la sesión activa del usuario.
 
 ### Consideraciones
 
 - `apps/backend/storage/` no se versiona; para conservar los adjuntos debe incluirse en las copias de seguridad del equipo o servidor.
-- Los adjuntos que se hayan guardado anteriormente en Supabase Storage no se migran automÃ¡ticamente. Para conservarlos, deben copiarse a `apps/backend/storage/` respetando la ruta registrada en la base de datos (`ruta_storage`).
+- Los adjuntos que se hayan guardado anteriormente en Supabase Storage no se migran automáticamente. Para conservarlos, deben copiarse a `apps/backend/storage/` respetando la ruta registrada en la base de datos (`ruta_storage`).
 
 ## 9. Pruebas y evidencias
 
@@ -406,20 +404,20 @@ Los archivos de pruebas se encuentran en:
 apps/backend/tests/
 ```
 
-Las pruebas automatizadas permiten validar los diferentes mÃ³dulos y reglas de negocio implementados en el backend. Utilizan SQLite en memoria y simulan la lectura y escritura de adjuntos, por lo que no requieren PostgreSQL ni archivos reales en `storage/`.
+Las pruebas automatizadas permiten validar los diferentes módulos y reglas de negocio implementados en el backend. Utilizan SQLite en memoria y simulan la lectura y escritura de adjuntos, por lo que no requieren PostgreSQL ni archivos reales en `storage/`.
 
 ### 9.2. Pruebas funcionales del proyecto
 
 Las pruebas funcionales deben documentar escenarios reproducibles que permitan verificar:
 
 - Casos exitosos.
-- Entradas invÃ¡lidas.
-- Permisos segÃºn el rol.
-- Persistencia de la informaciÃ³n.
+- Entradas inválidas.
+- Permisos según el rol.
+- Persistencia de la información.
 - Integridad de los datos.
-- IntegraciÃ³n entre interfaz, API y base de datos.
+- Integración entre interfaz, API y base de datos.
 
-Las evidencias de ejecuciÃ³n deben conservarse en:
+Las evidencias de ejecución deben conservarse en:
 
 ```text
 evidencias/
@@ -427,39 +425,38 @@ evidencias/
 
 ### 9.3. Matriz de trazabilidad
 
-La relaciÃ³n entre condiciones de aceptaciÃ³n, requisitos funcionales, implementaciÃ³n, Pull Requests y pruebas se documenta en:
+La relación entre condiciones de aceptación, requisitos funcionales, implementación, Pull Requests y pruebas se documenta en:
 
 [docs/trazabilidad.md](docs/trazabilidad.md).
 
-## 10. OrganizaciÃ³n del desarrollo
+## 10. Organización del desarrollo
 
-El desarrollo se organiza por mÃ³dulos y requisitos funcionales.
+El desarrollo se organiza por módulos y requisitos funcionales.
 
-- **Integrante 1:** mÃ³dulo coordinador y backend del solicitante.
-- **Integrante 2:** mÃ³dulo tÃ©cnico y frontend del solicitante.
-- **Trabajo compartido:** autenticaciÃ³n, sesiones, modelo de datos, contrato de API, conversaciones e integraciÃ³n.
+- **Integrante 1:** módulo coordinador y backend del solicitante.
+- **Integrante 2:** módulo técnico y frontend del solicitante.
+- **Trabajo compartido:** autenticación, sesiones, modelo de datos, contrato de API, conversaciones e integración.
 
 Cada requisito funcional se desarrolla en una rama independiente y se integra mediante Pull Requests, siguiendo el flujo de trabajo definido para el proyecto.
 
-Los cambios deben respetar los requisitos, el diseÃ±o, el modelo de datos y el contrato de la API.
+Los cambios deben respetar los requisitos, el diseño, el modelo de datos y el contrato de la API.
 
 ## 11. Estado del entorno y consideraciones
 
-El entorno local permite ejecutar el backend y el frontend utilizando Ãºnicamente PostgreSQL y el disco del equipo, sin depender de servicios externos como Supabase.
+El entorno local permite ejecutar el backend y el frontend utilizando únicamente PostgreSQL y el disco del equipo, sin depender de servicios externos como Supabase.
 
-Los archivos de configuraciÃ³n locales (`.env.local`) y la carpeta `apps/backend/storage/` no deben incluirse en los commits.
+Los archivos de configuración locales (`.env.local`) y la carpeta `apps/backend/storage/` no deben incluirse en los commits.
 
-El despliegue en producciÃ³n y sus variables de entorno deben configurarse de manera independiente al entorno local. En un despliegue, el directorio `storage/` debe residir en un volumen persistente y respaldado.
+El despliegue en producción y sus variables de entorno deben configurarse de manera independiente al entorno local. En un despliegue, el directorio `storage/` debe residir en un volumen persistente y respaldado.
 
-El alcance no contempla notificaciones externas por correo, SMS o WhatsApp, ni comunicaciÃ³n en tiempo real mediante WebSockets.
+El alcance no contempla notificaciones externas por correo, SMS o WhatsApp, ni comunicación en tiempo real mediante WebSockets.
 
-## 12. DocumentaciÃ³n complementaria
+## 12. Documentación complementaria
 
-- [GuÃ­a principal del proyecto](proyecto2.md).
+- [Guía principal del proyecto](proyecto2.md).
 - [Requisitos](docs/requisitos.md).
-- [DiseÃ±o](docs/diseno.md).
-- [Modelo entidad-relaciÃ³n](docs/MER.md).
+- [Diseño](docs/diseno.md).
+- [Modelo entidad-relación](docs/MER.md).
 - [Contrato de API](docs/contrato-api.md).
-- [GuÃ­a de desarrollo](docs/guia-desarrollo.md).
-- [Trazabilidad](docs/trazabilidad.md).
+- [Guía de desarrollo](docs/guia-desarrollo.md).
 - [Trazabilidad](docs/trazabilidad.md).
