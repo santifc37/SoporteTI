@@ -45,7 +45,6 @@ No se incluyen notificaciones por correo, SMS o WhatsApp, chat mediante WebSocke
 - [Requisitos funcionales y no funcionales](docs/requisitos.md).
 - [Diseño de la solución](docs/diseno.md).
 - [Contrato de la API](docs/contrato-api.md).
-- [Guía de desarrollo](docs/guia-desarrollo.md).
 - [Matriz de trazabilidad](docs/trazabilidad.md).
 - [Modelo entidad-relación](docs/MER.md).
 
@@ -458,5 +457,4 @@ El alcance no contempla notificaciones externas por correo, SMS o WhatsApp, ni c
 - [Diseño](docs/diseno.md).
 - [Modelo entidad-relación](docs/MER.md).
 - [Contrato de API](docs/contrato-api.md).
-- [Guía de desarrollo](docs/guia-desarrollo.md).
 - [Trazabilidad](docs/trazabilidad.md).
