@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.core.config import get_cors_origins
+from app.core.errors import register_error_handlers
 
 
 app = FastAPI(
@@ -11,6 +12,9 @@ app = FastAPI(
     description="API del sistema de gestión de solicitudes de soporte TI.",
     version="1.0.0"
 )
+
+
+register_error_handlers(app)
 
 
 app.add_middleware(

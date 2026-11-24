@@ -8,8 +8,14 @@ from dotenv import load_dotenv
 # Ruta de la carpeta apps/backend
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 
-# Cargar las variables del archivo .env
-load_dotenv(BACKEND_DIR / ".env")
+# Seleccionar el archivo de variables según el entorno.
+# APP_ENV=local -> .env.local
+# Cualquier otro valor -> .env
+APP_ENV = os.getenv("APP_ENV", "production").strip().lower()
+
+ENV_FILE = BACKEND_DIR / (".env.local" if APP_ENV == "local" else ".env")
+
+load_dotenv(ENV_FILE)
 
 
 def get_database_url() -> str:
@@ -18,7 +24,7 @@ def get_database_url() -> str:
 
     if not database_url:
         raise RuntimeError(
-            "No se encontró DATABASE_URL. Configura la conexión en apps/backend/.env"
+            f"No se encontró DATABASE_URL. Revisa el archivo {ENV_FILE.name}"
         )
 
     if database_url.startswith("postgres://"):
@@ -31,6 +37,33 @@ def get_database_url() -> str:
         )
 
     return database_url
+
+
+SESSION_COOKIE_NAME = "soporteti_session"
+
+
+def get_session_duration_hours() -> int:
+    """Duración de una sesión en horas (SESSION_DURATION_HOURS, 8 por defecto)."""
+    try:
+        horas = int(os.getenv("SESSION_DURATION_HOURS", "8"))
+    except ValueError:
+        return 8
+    return horas if horas > 0 else 8
+
+
+def get_session_cookie_secure() -> bool:
+    """La cookie solo viaja por HTTPS cuando es true. Activar en producción."""
+    return os.getenv("SESSION_COOKIE_SECURE", "false").strip().lower() == "true"
+
+
+def get_session_cookie_samesite() -> str:
+    """Atributo SameSite: lax (por defecto), strict o none.
+
+    `none` exige SESSION_COOKIE_SECURE=true y solo se necesita si frontend y
+    backend están en sitios distintos.
+    """
+    valor = os.getenv("SESSION_COOKIE_SAMESITE", "lax").strip().lower()
+    return valor if valor in {"lax", "strict", "none"} else "lax"
 
 
 def get_cors_origins() -> list[str]:

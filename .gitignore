@@ -1,0 +1,38 @@
+﻿# Dependencias de frontend
+**/node_modules/
+
+# Archivos compilados
+**/dist/
+**/build/
+
+# Entornos virtuales de Python
+**/.venv/
+**/venv/
+
+# Archivos temporales de Python
+**/__pycache__/
+*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+
+# Variables de entorno y secretos
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.*.example
+
+# Archivos de pruebas y cobertura
+**/.coverage
+**/coverage/
+
+# Almacenamiento local de archivos adjuntos
+/apps/backend/storage/*
+!/apps/backend/storage/.gitkeep
+
+# Registros
+*.log
+
+# Archivos temporales del sistema
+.DS_Store
+Thumbs.db

@@ -158,7 +158,7 @@ La autenticación se realizará mediante sesiones gestionadas por el backend.
 
 Se utilizará una cookie protegida para identificar al usuario autenticado.
 
-El frontend no deberá almacenar contraseñas, tokens de sesión ni credenciales administrativas de Supabase.
+El frontend no deberá almacenar contraseñas, tokens de sesión ni credenciales de conexión a la base de datos o de infraestructura del backend.
 
 ### 4.1. Iniciar sesión
 
@@ -1567,9 +1567,9 @@ Valores permitidos para `tipo_cambio`:
 
 ## 15. Archivos adjuntos
 
-Los archivos se almacenarán en Supabase Storage mediante el backend.
+Los archivos adjuntos se almacenarán en el sistema de archivos local del backend, dentro de `apps/backend/storage/`.
 
-Se utilizará un bucket privado.
+El backend será responsable de validar los archivos, convertir las imágenes al formato WebP, almacenarlas y controlar el acceso. PostgreSQL conservará los metadatos y la ruta relativa de cada archivo.
 
 ### 15.1. Adjuntar imagen a solicitud
 
@@ -1577,22 +1577,16 @@ Se utilizará un bucket privado.
 
 **Ruta:**
 
-```text
-/api/v1/requests/{id}/attachments
-```
+`/api/v1/requests/{solicitud_id}/attachments`
 
 **Permisos:**
 - Solicitante propietario.
-- Técnico asignado actualmente.
+- Técnico con asignación activa.
 - Coordinador.
 
 **Formato:** `multipart/form-data`
 
-**Campo:**
-
-```text
-archivo: imagen.png
-```
+**Campo:** `archivo`.
 
 **Respuesta:** `201 Created`
 
@@ -1603,22 +1597,24 @@ archivo: imagen.png
     "id": "uuid",
     "solicitud_id": "uuid",
     "nombre_archivo": "imagen.png",
-    "tipo_archivo": "image/png",
+    "tipo_archivo": "image/webp",
     "tamano": 204800,
     "fecha_subida": "2026-11-06T16:30:00Z"
   }
 }
 ```
 
-Reglas:
-- Se permitirán PNG, JPG y JPEG.
-- El tamaño máximo será de 5 MB por archivo.
-- El backend validará el contenido real del archivo, no solamente su extensión.
-- El archivo se almacenará en un bucket privado.
-- Se guardarán los metadatos en PostgreSQL.
-- No se permitirán adjuntos en solicitudes cerradas.
-- El usuario deberá tener acceso a la solicitud.
-- La ruta interna de Storage no se expondrá como enlace público.
+**Reglas:**
+- Se admiten imágenes compatibles con el conversor del backend, incluyendo PNG, JPEG y HEIF/HEIC.
+- El tamaño máximo de entrada es de 10 MB por archivo.
+- Se valida el contenido real del archivo.
+- Las imágenes se convierten a WebP antes de almacenarse.
+- Se conserva el nombre original como metadato.
+- El tipo MIME almacenado es `image/webp`.
+- Los metadatos se guardan en PostgreSQL y el archivo en el almacenamiento local.
+- No se permiten adjuntos en solicitudes cerradas.
+- El usuario debe tener autorización para acceder a la solicitud.
+- No se exponen las rutas físicas del almacenamiento.
 
 ### 15.2. Consultar adjuntos de una solicitud
 
@@ -1626,13 +1622,11 @@ Reglas:
 
 **Ruta:**
 
-```text
-/api/v1/requests/{id}/attachments
-```
+`/api/v1/requests/{solicitud_id}/attachments`
 
 **Permisos:**
 - Solicitante propietario.
-- Técnico asignado actualmente.
+- Técnico con asignación activa.
 - Coordinador.
 
 **Respuesta:** `200 OK`
@@ -1643,7 +1637,7 @@ Reglas:
     {
       "id": "uuid",
       "nombre_archivo": "imagen.png",
-      "tipo_archivo": "image/png",
+      "tipo_archivo": "image/webp",
       "tamano": 204800,
       "subido_por": "uuid",
       "fecha_subida": "2026-11-06T16:30:00Z"
@@ -1652,36 +1646,156 @@ Reglas:
 }
 ```
 
-### 15.3. Consultar o descargar archivo
+La consulta devuelve los adjuntos asociados directamente a la solicitud, excluyendo los asociados a mensajes e intervenciones.
+
+### 15.3. Descargar archivo adjunto
 
 **Método:** `GET`
 
 **Ruta:**
 
-```text
-/api/v1/attachments/{id}/download
+`/api/v1/attachments/{adjunto_id}/download`
+
+**Permisos:** Usuarios autorizados para consultar el recurso al que pertenece el adjunto.
+
+**Respuesta:** Archivo binario con el tipo MIME correspondiente.
+
+El backend:
+- Verifica que el adjunto exista.
+- Valida los permisos de acceso según su asociación con una solicitud, mensaje o intervención.
+- Lee el archivo desde el almacenamiento local.
+- Devuelve el contenido mediante una respuesta binaria.
+- Utiliza `Content-Disposition` para indicar el nombre del archivo descargado.
+
+No se exponen rutas físicas ni enlaces públicos a los archivos.
+
+### 15.4. Adjuntos en mensajes
+
+Los mensajes pueden tener imágenes adjuntas mediante los siguientes endpoints.
+
+#### Adjuntar imagen
+
+**Método:** `POST`
+
+**Ruta:**
+
+`/api/v1/requests/{solicitud_id}/messages/{mensaje_id}/attachments`
+
+**Formato:** `multipart/form-data`
+
+**Campo:** `archivo`.
+
+**Permisos:** Usuarios autorizados para acceder a la solicitud y al mensaje relacionado.
+
+**Respuesta:** `201 Created`
+
+```json
+{
+  "mensaje": "Imagen adjuntada correctamente",
+  "adjunto": {
+    "id": "uuid",
+    "solicitud_id": "uuid",
+    "mensaje_id": "uuid",
+    "nombre_archivo": "imagen.png",
+    "tipo_archivo": "image/webp",
+    "tamano": 204800,
+    "fecha_subida": "2026-11-06T16:30:00Z"
+  }
+}
 ```
 
-**Permisos:** Usuarios autorizados para consultar la solicitud relacionada.
+#### Consultar imágenes
 
-**Respuesta:** Archivo binario o redirección/enlace temporal autorizado, según la implementación de Storage.
+**Método:** `GET`
 
-El backend deberá validar los permisos antes de proporcionar acceso al archivo.
+**Ruta:**
 
-### 15.4. Adjuntos en mensajes e intervenciones
+`/api/v1/requests/{solicitud_id}/messages/{mensaje_id}/attachments`
 
-Los adjuntos asociados a mensajes e intervenciones corresponden a funcionalidades complementarias de prioridad baja.
+**Permisos:** Usuarios autorizados para acceder a la solicitud y al mensaje relacionado.
 
-Si se implementan, utilizarán rutas específicas:
+**Respuesta:** `200 OK`
 
-```text
-POST /api/v1/requests/{id}/messages/{message_id}/attachments
-POST /api/v1/requests/{id}/interventions/{intervention_id}/attachments
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "mensaje_id": "uuid",
+      "nombre_archivo": "imagen.png",
+      "tipo_archivo": "image/webp",
+      "tamano": 204800,
+      "subido_por": "uuid",
+      "fecha_subida": "2026-11-06T16:30:00Z",
+      "url": "/api/v1/attachments/{adjunto_id}/download"
+    }
+  ]
+}
 ```
 
-Estas operaciones deberán respetar los mismos límites de formato, tamaño y autorización definidos para los adjuntos.
+### 15.5. Adjuntos en intervenciones
 
-No son necesarias para cerrar los primeros flujos principales.
+Los técnicos pueden adjuntar imágenes a sus intervenciones.
+
+#### Adjuntar imagen
+
+**Método:** `POST`
+
+**Ruta:**
+
+`/api/v1/requests/{solicitud_id}/interventions/{intervencion_id}/attachments`
+
+**Formato:** `multipart/form-data`
+
+**Campo:** `archivo`.
+
+**Permisos:** Técnico.
+
+**Respuesta:** `201 Created`
+
+```json
+{
+  "mensaje": "Imagen adjuntada correctamente.",
+  "adjunto": {
+    "id": "uuid",
+    "solicitud_id": "uuid",
+    "nombre_archivo": "imagen.png",
+    "tipo_archivo": "image/webp",
+    "tamano": 204800,
+    "fecha_subida": "2026-11-06T16:30:00Z"
+  }
+}
+```
+
+#### Consultar imágenes
+
+**Método:** `GET`
+
+**Ruta:**
+
+`/api/v1/requests/{solicitud_id}/interventions/{intervencion_id}/attachments`
+
+**Permisos:** Usuarios autorizados para consultar la intervención.
+
+**Respuesta:** `200 OK`
+
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "intervencion_id": "uuid",
+      "nombre_archivo": "imagen.png",
+      "tipo_archivo": "image/webp",
+      "tamano": 204800,
+      "fecha_subida": "2026-11-06T16:30:00Z",
+      "url": "/api/v1/attachments/{adjunto_id}/download"
+    }
+  ]
+}
+```
+
+Las imágenes de solicitudes, mensajes e intervenciones utilizan el mismo proceso de validación, conversión a WebP y almacenamiento local.
 
 ---
 
@@ -1848,7 +1962,7 @@ Se utilizarán códigos descriptivos para identificar los errores más frecuente
 | `TECNICO_NO_VALIDO` | El técnico no existe o está inactivo. |
 | `PETICION_YA_RESPONDIDA` | La petición de información ya tiene respuesta. |
 | `ARCHIVO_NO_VALIDO` | El archivo no corresponde a un formato permitido. |
-| `ARCHIVO_DEMASIADO_GRANDE` | El archivo supera los 5 MB. |
+| `ARCHIVO_DEMASIADO_GRANDE` | El archivo supera los 10 MB. |
 | `CONFLICTO_CONCURRENCIA` | La solicitud fue modificada por otra operación simultánea. |
 
 Los mensajes de error no deberán revelar contraseñas, hashes, claves privadas, rutas internas ni detalles técnicos sensibles.
@@ -1884,9 +1998,10 @@ Las siguientes condiciones serán obligatorias:
 - Los permisos se validarán en el backend.
 - Las contraseñas se almacenarán mediante hash seguro.
 - Las cookies de sesión utilizarán los atributos de seguridad definidos en el diseño.
-- Las credenciales de Supabase permanecerán exclusivamente en el backend.
+- Las credenciales de conexión a PostgreSQL y demás variables privadas de infraestructura permanecerán exclusivamente en el backend y en la configuración segura del entorno.
 - Las operaciones que utilicen cookies deberán aplicar protección CSRF cuando corresponda.
-- Los archivos se almacenarán en un bucket privado.
+- Los archivos se almacenarán en el sistema de archivos local del backend, dentro de `apps/backend/storage/`, y no tendrán acceso público directo.
+- La descarga de archivos se realizará mediante endpoints autenticados que validen los permisos del usuario sobre el recurso asociado.
 - Las solicitudes cerradas serán de solo consulta.
 - Los errores no expondrán información sensible.
 - Las operaciones importantes quedarán registradas en el historial.

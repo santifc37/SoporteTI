@@ -1,6 +1,6 @@
 # Credenciales locales: nunca subir
 .env
-
+.env.local
 # Entorno virtual de Python
 venv/
 .venv/
