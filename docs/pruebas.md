@@ -2,41 +2,58 @@
 
 ## 1. Objetivo
 
-Este documento registra las pruebas funcionales de SoporteTI para verificar el comportamiento de la aplicación, sus servicios web, las reglas de negocio y la persistencia de la información.
+Este documento define y registra las pruebas funcionales de SoporteTI para verificar el comportamiento de la aplicación, sus servicios web, las reglas de negocio y la persistencia de la información.
 
-Las pruebas se relacionan con los requisitos funcionales y las seis condiciones de aceptación definidas en `proyecto2.md`.
+Las pruebas permiten comprobar el cumplimiento de los requisitos funcionales y de las seis condiciones de aceptación establecidas en `proyecto2.md`.
 
-Se ejecutarán manualmente mediante Swagger UI (`/docs`), la interfaz web y las consultas necesarias a la base de datos. No se exige automatizar estas pruebas con pytest, Postman CLI, Newman ni herramientas de integración continua.
+La ejecución se realizará mediante Swagger UI (`/docs`), la interfaz web y las consultas necesarias a la base de datos.
+
+Este documento corresponde a las pruebas funcionales de la entrega académica. No debe confundirse con las pruebas automatizadas del backend ejecutadas mediante pytest.
 
 ## 2. Alcance
 
-Se documentan las 12 pruebas funcionales previstas en `docs/requisitos.md`:
+De acuerdo con la Actividad 6 de `proyecto2.md`, se deben realizar doce pruebas funcionales.
 
-| ID | Prueba | Condición de aceptación |
+| ID | Prueba | Criterio de aceptación |
 |---|---|---|
-| PF-01 | Inicio de sesión con credenciales válidas e inválidas | CA-01 |
-| PF-02 | Acceso a funcionalidades según el rol | CA-01 |
-| PF-03 | Creación de usuarios por el coordinador | CA-01 |
-| PF-04 | Registro de una solicitud por un solicitante | CA-02 |
-| PF-05 | Consulta de solicitudes según el rol | CA-02 |
-| PF-06 | Evaluación, clasificación y prioridad | CA-03 |
-| PF-07 | Asignación y reasignación de técnicos | CA-03 |
-| PF-08 | Registro de intervención técnica | CA-04 |
-| PF-09 | Solicitud y respuesta de información adicional | CA-04 |
-| PF-10 | Registro de solución y cierre | CA-05 |
-| PF-11 | Cancelación y cierre administrativo | CA-05 |
-| PF-12 | Consulta del consolidado del coordinador | CA-06 |
+| PF-01 | Registro válido de un caso de soporte. | CA-01 |
+| PF-02 | Registro de un caso con datos inválidos. | CA-01 |
+| PF-03 | Consulta de un caso existente. | CA-01, CA-03 y CA-05 |
+| PF-04 | Consulta de un caso inexistente. | CA-03 |
+| PF-05 | Gestión de un caso por personal autorizado. | CA-02 |
+| PF-06 | Intento de gestión por un actor no autorizado. | CA-02 |
+| PF-07 | Consulta del estado y responsable de un caso. | CA-03 |
+| PF-08 | Consulta del historial de intervenciones. | CA-04 |
+| PF-09 | Cierre de un caso y consulta del resultado. | CA-05 |
+| PF-10 | Consulta consolidada de coordinación. | CA-06 |
+| PF-11 | Verificación de persistencia e integridad de relaciones. | CA-01, CA-02 y CA-04 |
+| PF-12 | Verificación de integración entre interfaz, API y base de datos. | CA-01 a CA-06 |
+
+Las pruebas abarcan los siguientes aspectos:
+
+- Registro y consulta de solicitudes.
+- Validación de datos.
+- Autorización de operaciones según el rol.
+- Evaluación y gestión de solicitudes.
+- Consulta de estados y responsables.
+- Registro y consulta de intervenciones.
+- Cierre y consulta de resultados.
+- Consulta consolidada de coordinación.
+- Persistencia e integridad de la información.
+- Integración entre frontend, backend y base de datos.
 
 ## 3. Preparación del entorno
 
-Antes de ejecutar las pruebas:
+Antes de ejecutar las pruebas se deben cumplir las siguientes condiciones:
 
 1. Tener el backend configurado y en ejecución.
-2. Tener disponible la base de datos configurada para la aplicación.
-3. Abrir la documentación interactiva de la API en `http://127.0.0.1:8000/docs`.
-4. Si se realizan pruebas desde la interfaz, tener también el frontend en ejecución y conectado al backend.
-5. Disponer de cuentas de prueba para los roles solicitante, técnico y coordinador.
-6. Utilizar información ficticia para las solicitudes, usuarios y demás registros.
+2. Tener disponible la instancia de PostgreSQL utilizada por el entorno local.
+3. Tener aplicadas las migraciones de base de datos correspondientes.
+4. Abrir la documentación interactiva de la API en `http://127.0.0.1:8000/docs`.
+5. Si la prueba requiere la interfaz web, tener también el frontend en ejecución y conectado al backend.
+6. Disponer de cuentas de prueba para los roles solicitante, técnico y coordinador.
+7. Contar con solicitudes de prueba en los estados necesarios para cada escenario.
+8. Utilizar información ficticia para los usuarios, solicitudes y demás registros.
 
 ### 3.1. Datos de prueba
 
@@ -44,17 +61,28 @@ Se utilizarán los siguientes actores ficticios:
 
 | Actor | Rol | Uso |
 |---|---|---|
-| Usuario Solicitante A | Solicitante | Crear y consultar sus solicitudes. |
-| Usuario Solicitante B | Solicitante | Comprobar restricciones de acceso a solicitudes ajenas. |
-| Usuario Técnico A | Técnico | Consultar casos asignados y registrar actuaciones. |
+| Usuario Solicitante A | Solicitante | Registrar y consultar sus solicitudes. |
+| Usuario Solicitante B | Solicitante | Comprobar las restricciones de acceso a solicitudes ajenas. |
+| Usuario Técnico A | Técnico | Consultar solicitudes asignadas y registrar intervenciones. |
 | Usuario Técnico B | Técnico | Comprobar asignaciones y reasignaciones. |
-| Usuario Coordinador A | Coordinador | Administrar usuarios, evaluar, asignar y cerrar solicitudes. |
+| Usuario Coordinador A | Coordinador | Evaluar, gestionar, asignar y supervisar solicitudes. |
 
-Los nombres, correos y contraseñas utilizados durante la ejecución deben ser datos ficticios. Las credenciales reales no se deben registrar en este documento.
+Los datos de prueba deberán ser ficticios. Las contraseñas, tokens y credenciales reales no se deben registrar en este documento ni en las evidencias.
 
-### 3.2. Registro de resultados
+### 3.2. Herramientas de ejecución
 
-Cada prueba tendrá uno de estos estados:
+Las pruebas podrán utilizar:
+
+- Swagger UI para ejecutar operaciones de la API REST.
+- La interfaz web para comprobar los flujos desde la perspectiva de los usuarios.
+- PostgreSQL para verificar la persistencia y las relaciones entre registros.
+- Capturas de pantalla y registros de respuestas HTTP como evidencia.
+
+Los endpoints concretos se deben consultar en la documentación interactiva de la API. No se deben asumir rutas o métodos HTTP que no estén publicados por la implementación actual.
+
+### 3.3. Registro de resultados
+
+Cada prueba tendrá uno de los siguientes estados:
 
 - **Pendiente:** todavía no se ha ejecutado.
 - **Aprobada:** el resultado obtenido coincide con el resultado esperado.
@@ -67,494 +95,651 @@ Las pruebas solo se marcarán como aprobadas después de su ejecución y comprob
 
 ## 4. Casos de prueba
 
-### PF-01. Inicio de sesión con credenciales válidas e inválidas
+### PF-01. Registro válido de un caso de soporte
 
-**Condición de aceptación:** CA-01.  
-**Requisito relacionado:** RF-01.  
-**Objetivo:** comprobar que un usuario registrado puede iniciar sesión y que el sistema rechaza credenciales incorrectas.
+**Criterio de aceptación:** CA-01.
+
+**Requisito relacionado:** RF-06.
+
+**Objetivo:** comprobar que un solicitante puede registrar un incidente o requerimiento de soporte con información válida y que el sistema conserva el caso.
 
 **Precondiciones:**
+
 - El backend está en ejecución.
-- Existe una cuenta de prueba activa.
-- Se conoce la contraseña de la cuenta de prueba.
-
-**Datos de entrada:**
-- Correo y contraseña válidos.
-- Correo existente con contraseña incorrecta.
-- Correo no registrado.
-
-**Pasos:**
-1. Abrir Swagger UI o la pantalla de inicio de sesión.
-2. Ejecutar el inicio de sesión con credenciales válidas.
-3. Comprobar que el acceso se realiza correctamente.
-4. Ejecutar nuevamente el inicio de sesión con una contraseña incorrecta.
-5. Intentar iniciar sesión con un correo no registrado.
-6. Comprobar que los intentos inválidos no permiten acceder al sistema.
-
-**Resultado esperado:**
-- Las credenciales válidas permiten iniciar sesión.
-- El sistema establece la sesión correspondiente.
-- Las credenciales incorrectas son rechazadas con una respuesta controlada.
-- No se expone información sensible en los mensajes de error.
-
-**Resultado obtenido:** Pendiente de ejecución.  
-**Estado:** Pendiente.  
-**Evidencia:** Captura del inicio de sesión exitoso y de las respuestas de los intentos inválidos.
-
----
-
-### PF-02. Acceso a funcionalidades según el rol
-
-**Condición de aceptación:** CA-01.  
-**Requisito relacionado:** RF-02.  
-**Objetivo:** verificar que los permisos se apliquen según el rol del usuario autenticado.
-
-**Precondiciones:**
-- Existen cuentas de solicitante, técnico y coordinador.
-- Las tres cuentas pueden iniciar sesión.
-- Se dispone de las operaciones protegidas de la API.
-
-**Datos de entrada:**
-- Sesión del solicitante.
-- Sesión del técnico.
-- Sesión del coordinador.
-
-**Pasos:**
-1. Iniciar sesión como solicitante.
-2. Consultar las operaciones permitidas para ese rol.
-3. Intentar ejecutar una operación exclusiva del coordinador.
-4. Cerrar sesión e iniciar como técnico.
-5. Intentar consultar o modificar información que no corresponda a sus permisos.
-6. Iniciar sesión como coordinador.
-7. Comprobar el acceso a las operaciones administrativas autorizadas.
-
-**Resultado esperado:**
-- Cada rol puede ejecutar únicamente las operaciones permitidas.
-- Las operaciones no autorizadas son rechazadas.
-- El backend aplica los permisos aunque se invoquen directamente los endpoints sin utilizar la interfaz.
-
-**Resultado obtenido:** Pendiente de ejecución.  
-**Estado:** Pendiente.  
-**Evidencia:** Capturas de las operaciones permitidas y rechazadas para cada rol.
-
----
-
-### PF-03. Creación de usuarios por el coordinador
-
-**Condición de aceptación:** CA-01.  
-**Requisito relacionado:** RF-03.  
-**Objetivo:** comprobar que el coordinador puede registrar usuarios con sus datos y rol correspondiente.
-
-**Precondiciones:**
-- Existe una cuenta de coordinador.
-- El coordinador inició sesión.
-- No existe previamente el correo que se utilizará.
-
-**Datos de entrada:**
-- Nombre: Usuario de prueba.
-- Correo: una dirección ficticia no registrada.
-- Rol: técnico o solicitante.
-- Los demás datos obligatorios definidos por el sistema.
-
-**Pasos:**
-1. Iniciar sesión como coordinador.
-2. Abrir la operación de creación de usuarios.
-3. Registrar un usuario con datos válidos.
-4. Consultar el listado de usuarios.
-5. Verificar que el usuario creado aparece con el rol asignado.
-6. Intentar crear otro usuario con datos inválidos o con un correo duplicado.
-7. Comprobar que el sistema rechaza el registro incorrecto.
-
-**Resultado esperado:**
-- El coordinador puede crear usuarios con datos válidos.
-- El usuario queda almacenado y puede recuperarse.
-- El rol asignado corresponde al enviado.
-- Los datos inválidos o duplicados son rechazados.
-
-**Resultado obtenido:** Pendiente de ejecución.  
-**Estado:** Pendiente.  
-**Evidencia:** Captura del registro exitoso y de la consulta del usuario creado.
-
----
-
-### PF-04. Registro de una solicitud por un solicitante
-
-**Condición de aceptación:** CA-02.  
-**Requisito relacionado:** RF-06.  
-**Objetivo:** comprobar que un solicitante puede registrar una solicitud con la información obligatoria y que esta queda persistida.
-
-**Precondiciones:**
-- Existe una cuenta de solicitante.
+- La base de datos está disponible.
+- Existe una cuenta activa de solicitante.
 - El solicitante inició sesión.
-- Existen las categorías y los datos requeridos por el formulario.
+- Se dispone de los datos necesarios para registrar una solicitud.
 
 **Datos de entrada:**
+
+- Asunto o título.
+- Descripción del problema.
 - Tipo de solicitud.
-- Descripción del incidente o necesidad.
+- Categoría, cuando corresponda.
 - Ubicación.
-- Datos de contacto.
 - Identificador del equipo, cuando corresponda.
+- Información de contacto requerida.
 
 **Pasos:**
+
 1. Iniciar sesión como solicitante.
-2. Abrir la operación de creación de solicitudes o el formulario correspondiente.
-3. Enviar una solicitud con todos los datos obligatorios.
-4. Comprobar la respuesta del sistema.
-5. Consultar las solicitudes del usuario.
-6. Recuperar el detalle de la solicitud recién creada.
-7. Intentar registrar otra solicitud omitiendo un dato obligatorio.
+2. Abrir el formulario de creación de solicitudes o la operación correspondiente de la API.
+3. Completar los campos obligatorios con información válida.
+4. Enviar la solicitud.
+5. Comprobar la respuesta del sistema.
+6. Consultar las solicitudes del usuario.
+7. Recuperar el detalle de la solicitud recién creada.
 
 **Resultado esperado:**
-- La solicitud válida se registra correctamente.
-- Se asigna el estado inicial definido por el sistema (`Registrado`).
-- La solicitud puede recuperarse posteriormente.
-- Los datos obligatorios faltantes generan una respuesta de validación y no se guarda una solicitud incompleta.
 
-**Resultado obtenido:** Pendiente de ejecución.  
-**Estado:** Pendiente.  
-**Evidencia:** Captura de la creación, respuesta de la API y consulta posterior del registro.
+- El sistema registra correctamente la solicitud.
+- La solicitud queda asociada al solicitante autenticado.
+- Se asigna el estado inicial `Registrado`.
+- Se conserva la fecha de creación.
+- La solicitud puede recuperarse posteriormente.
+
+**Resultado obtenido:** Pendiente de ejecución.
+
+**Estado:** Pendiente.
+
+**Evidencia:** Captura del registro, respuesta de la API y consulta posterior de la solicitud.
 
 ---
 
-### PF-05. Consulta de solicitudes según el rol
+### PF-02. Registro de un caso con datos inválidos
 
-**Condición de aceptación:** CA-02.  
-**Requisitos relacionados:** RF-07 y RF-13.  
-**Objetivo:** verificar que cada rol consulte únicamente el conjunto de solicitudes permitido.
+**Criterio de aceptación:** CA-01.
+
+**Requisito relacionado:** RF-06.
+
+**Objetivo:** comprobar que el sistema valida la información recibida y rechaza solicitudes con datos obligatorios ausentes o inválidos.
 
 **Precondiciones:**
-- Existen solicitudes de distintos solicitantes.
-- Existen solicitudes asignadas a diferentes técnicos.
-- Hay cuentas de los tres roles.
+
+- El backend está en ejecución.
+- La base de datos está disponible.
+- Existe una cuenta activa de solicitante.
+- El solicitante inició sesión.
 
 **Datos de entrada:**
-- Cuenta de solicitante A.
-- Cuenta de solicitante B.
-- Cuenta de técnico A.
-- Cuenta de coordinador.
+
+Se realizarán diferentes intentos utilizando:
+
+- Asunto vacío.
+- Descripción vacía.
+- Tipo de solicitud inválido.
+- Datos con formato incorrecto.
+- Identificador del equipo ausente cuando sea obligatorio para el caso.
 
 **Pasos:**
-1. Iniciar sesión como solicitante A.
-2. Consultar el listado de solicitudes.
-3. Verificar que aparecen sus propias solicitudes.
-4. Intentar consultar una solicitud perteneciente al solicitante B.
-5. Iniciar sesión como técnico A.
-6. Consultar sus solicitudes asignadas.
-7. Comprobar que no aparecen solicitudes asignadas exclusivamente a otro técnico.
-8. Iniciar sesión como coordinador.
-9. Consultar el listado general de solicitudes.
+
+1. Iniciar sesión como solicitante.
+2. Abrir el formulario de creación de solicitudes o la operación correspondiente.
+3. Enviar una solicitud sin completar un campo obligatorio.
+4. Comprobar la respuesta del sistema.
+5. Repetir la operación utilizando un valor inválido.
+6. Consultar las solicitudes del usuario.
+7. Verificar que los intentos rechazados no hayan generado registros incorrectos.
 
 **Resultado esperado:**
-- El solicitante consulta sus propias solicitudes.
-- El técnico consulta las solicitudes que tiene asignadas.
-- El coordinador puede consultar las solicitudes dentro de su ámbito de gestión.
-- Los intentos de acceso a solicitudes ajenas sin autorización son rechazados.
 
-**Resultado obtenido:** Pendiente de ejecución.  
-**Estado:** Pendiente.  
-**Evidencia:** Capturas de los listados y de los intentos de acceso no autorizado.
+- El sistema rechaza los datos inválidos.
+- La respuesta informa el error de validación.
+- No se registra una solicitud incompleta o incorrecta.
+- Los registros existentes no se modifican como consecuencia de los intentos rechazados.
+
+**Resultado obtenido:** Pendiente de ejecución.
+
+**Estado:** Pendiente.
+
+**Evidencia:** Capturas de los datos inválidos, respuestas de validación y consulta de solicitudes.
 
 ---
 
-### PF-06. Evaluación, clasificación y prioridad
+### PF-03. Consulta de un caso existente
 
-**Condición de aceptación:** CA-03.  
-**Requisitos relacionados:** RF-09 y RF-10.  
-**Objetivo:** comprobar que el coordinador puede evaluar una solicitud y establecer su clasificación y prioridad.
+**Criterios de aceptación:** CA-01, CA-03 y CA-05.
+
+**Requisitos relacionados:** RF-07, RF-13, RF-19 y RF-20.
+
+**Objetivo:** comprobar que el sistema permite recuperar una solicitud existente y presentar la información correspondiente según los permisos del usuario.
 
 **Precondiciones:**
-- Existe una solicitud registrada y pendiente de evaluación.
-- El coordinador inició sesión.
-- Existen categorías disponibles.
+
+- Existe una solicitud previamente registrada.
+- La solicitud tiene un identificador válido.
+- Se dispone de las cuentas necesarias para consultar la información.
+- La solicitud tiene información almacenada que puede recuperarse.
 
 **Datos de entrada:**
-- Solicitud existente.
+
+- Identificador de una solicitud existente.
+- Cuenta del solicitante propietario.
+- Cuenta del técnico asignado, cuando corresponda.
+- Cuenta del coordinador.
+
+**Pasos:**
+
+1. Iniciar sesión como solicitante propietario.
+2. Consultar el listado de sus solicitudes.
+3. Seleccionar una solicitud existente.
+4. Consultar su información detallada.
+5. Comprobar que los datos coinciden con los registrados.
+6. Iniciar sesión como coordinador.
+7. Consultar la misma solicitud.
+8. Verificar que la información corresponde al mismo registro.
+
+**Resultado esperado:**
+
+- El sistema recupera la solicitud existente.
+- La información presentada coincide con los datos almacenados.
+- El solicitante puede consultar sus propias solicitudes.
+- El coordinador puede consultar las solicitudes dentro de su ámbito de gestión.
+- Los permisos se aplican de acuerdo con el rol del usuario.
+
+**Resultado obtenido:** Pendiente de ejecución.
+
+**Estado:** Pendiente.
+
+**Evidencia:** Capturas del listado y detalle de la solicitud desde los roles utilizados.
+
+---
+
+### PF-04. Consulta de un caso inexistente
+
+**Criterio de aceptación:** CA-03.
+
+**Requisito relacionado:** RF-07.
+
+**Objetivo:** comprobar que el sistema maneja correctamente las consultas de solicitudes que no existen.
+
+**Precondiciones:**
+
+- El backend está en ejecución.
+- Existe una cuenta autenticada con permisos para consultar solicitudes.
+- Se dispone de un identificador que no corresponde a ninguna solicitud registrada.
+
+**Datos de entrada:**
+
+- Identificador inexistente de una solicitud.
+
+**Pasos:**
+
+1. Iniciar sesión con una cuenta autorizada.
+2. Abrir la operación de consulta de una solicitud por identificador.
+3. Enviar un identificador que no exista en la base de datos.
+4. Comprobar la respuesta del sistema.
+5. Verificar que no se presenta información de otra solicitud.
+
+**Resultado esperado:**
+
+- El sistema informa que la solicitud no existe.
+- Se devuelve una respuesta de error controlada.
+- No se presentan datos de otros registros.
+- La operación no modifica la información almacenada.
+
+**Resultado obtenido:** Pendiente de ejecución.
+
+**Estado:** Pendiente.
+
+**Evidencia:** Captura de la solicitud HTTP y de la respuesta obtenida.
+
+---
+
+### PF-05. Gestión de un caso por personal autorizado
+
+**Criterio de aceptación:** CA-02.
+
+**Requisitos relacionados:** RF-09, RF-10, RF-11, RF-12 y RF-14.
+
+**Objetivo:** comprobar que el personal autorizado puede realizar las operaciones de evaluación, clasificación, asignación y gestión de una solicitud, respetando las reglas del sistema.
+
+**Precondiciones:**
+
+- Existe una solicitud registrada.
+- La solicitud se encuentra en un estado que permite su evaluación.
+- Existe una cuenta activa de coordinador.
+- Existen técnicos activos para realizar la asignación.
+
+**Datos de entrada:**
+
+- Identificador de la solicitud.
 - Categoría válida.
 - Prioridad válida.
-- Datos de evaluación requeridos por el sistema.
+- Técnico seleccionado.
+- Estado permitido para la operación correspondiente.
 
 **Pasos:**
+
 1. Iniciar sesión como coordinador.
 2. Consultar una solicitud pendiente de evaluación.
-3. Ejecutar la operación de evaluación.
-4. Asignar una categoría y una prioridad válidas.
-5. Consultar nuevamente el detalle de la solicitud.
-6. Comprobar que los datos se conservaron.
-7. Intentar enviar una categoría o prioridad inválida.
+3. Ejecutar la evaluación de la solicitud.
+4. Establecer una categoría y prioridad válidas.
+5. Guardar los cambios.
+6. Asignar la solicitud a un técnico.
+7. Consultar nuevamente el detalle de la solicitud.
+8. Verificar que el responsable, la clasificación y la prioridad se hayan actualizado.
+9. Consultar el historial de cambios, cuando corresponda.
 
 **Resultado esperado:**
-- El coordinador puede evaluar y clasificar la solicitud.
-- La categoría y prioridad quedan asociadas al caso.
-- Los cambios se pueden consultar posteriormente.
-- Los valores inválidos son rechazados.
 
-**Resultado obtenido:** Pendiente de ejecución.  
-**Estado:** Pendiente.  
-**Evidencia:** Captura de la evaluación y del detalle actualizado de la solicitud.
+- El coordinador puede evaluar la solicitud.
+- La clasificación y prioridad quedan almacenadas.
+- La asignación queda asociada a la solicitud y al técnico responsable.
+- Las operaciones se registran de acuerdo con las reglas del sistema.
+- Los cambios pueden recuperarse posteriormente.
+
+**Resultado obtenido:** Pendiente de ejecución.
+
+**Estado:** Pendiente.
+
+**Evidencia:** Capturas de la evaluación, clasificación, asignación y consulta posterior de la solicitud.
 
 ---
 
-### PF-07. Asignación y reasignación de técnicos
+### PF-06. Intento de gestión por un actor no autorizado
 
-**Condición de aceptación:** CA-03.  
-**Requisitos relacionados:** RF-11 y RF-12.  
-**Objetivo:** comprobar que el coordinador puede asignar una solicitud a un técnico y reasignarla cuando sea necesario.
+**Criterio de aceptación:** CA-02.
+
+**Requisito relacionado:** RF-02.
+
+**Objetivo:** verificar que el sistema impide que un usuario realice operaciones de gestión que no están permitidas para su rol.
 
 **Precondiciones:**
-- Existe una solicitud evaluada.
-- Existen al menos dos técnicos activos.
-- El coordinador inició sesión.
+
+- Existen cuentas activas de solicitante y técnico.
+- Existe una solicitud sobre la que se pueden realizar operaciones administrativas.
+- Las cuentas utilizadas tienen sesiones válidas.
 
 **Datos de entrada:**
-- Identificador de la solicitud.
-- Identificador del técnico A.
-- Identificador del técnico B.
+
+- Sesión de solicitante.
+- Sesión de técnico.
+- Identificador de una solicitud.
+- Operaciones administrativas que requieren permisos de coordinación.
 
 **Pasos:**
+
+1. Iniciar sesión como solicitante.
+2. Intentar realizar una operación exclusiva del coordinador, como asignar un técnico o modificar la prioridad.
+3. Comprobar que el sistema rechaza la operación.
+4. Iniciar sesión como técnico.
+5. Intentar ejecutar una operación exclusiva del coordinador.
+6. Comprobar que el sistema rechaza la operación.
+7. Consultar nuevamente la solicitud.
+8. Verificar que los intentos no autorizados no hayan modificado su información.
+
+**Resultado esperado:**
+
+- Los usuarios sin permisos no pueden ejecutar operaciones administrativas.
+- El backend rechaza las solicitudes no autorizadas.
+- La información de la solicitud permanece sin cambios.
+- La protección se aplica aunque se invoque directamente la API y no se utilice la interfaz.
+
+**Resultado obtenido:** Pendiente de ejecución.
+
+**Estado:** Pendiente.
+
+**Evidencia:** Capturas de las operaciones rechazadas y de la consulta posterior de la solicitud.
+
+---
+
+### PF-07. Consulta del estado y responsable de un caso
+
+**Criterio de aceptación:** CA-03.
+
+**Requisitos relacionados:** RF-07, RF-11, RF-12, RF-13 y RF-14.
+
+**Objetivo:** comprobar que el sistema presenta el estado actual de una solicitud y permite identificar al responsable de su atención.
+
+**Precondiciones:**
+
+- Existe una solicitud registrada.
+- La solicitud tiene un técnico asignado.
+- Se dispone de una cuenta de solicitante y una cuenta de coordinador.
+- La solicitud puede consultarse según los permisos de cada usuario.
+
+**Datos de entrada:**
+
+- Identificador de la solicitud.
+- Estado actual.
+- Identificador del técnico responsable.
+
+**Pasos:**
+
 1. Iniciar sesión como coordinador.
-2. Seleccionar una solicitud que pueda asignarse.
-3. Asignarla al técnico A.
-4. Consultar los datos de la asignación.
-5. Reasignar la solicitud al técnico B.
-6. Consultar nuevamente el responsable actual.
-7. Consultar el historial de asignaciones.
-8. Iniciar sesión como cada técnico y comprobar las solicitudes que tiene asignadas.
+2. Consultar la solicitud.
+3. Verificar el estado y el técnico responsable.
+4. Iniciar sesión como técnico asignado.
+5. Consultar la solicitud desde su listado de asignaciones.
+6. Iniciar sesión como solicitante propietario.
+7. Consultar el estado de su solicitud.
+8. Comparar la información presentada con los registros existentes.
+9. Si se realiza un cambio de estado permitido, consultar nuevamente la solicitud y verificar la actualización.
 
 **Resultado esperado:**
-- La asignación inicial queda registrada.
-- La reasignación actualiza el responsable.
-- Se conserva la información histórica de las asignaciones.
-- El técnico B puede consultar la solicitud asignada y el técnico A deja de verla como asignación vigente, según las reglas del sistema.
 
-**Resultado obtenido:** Pendiente de ejecución.  
-**Estado:** Pendiente.  
-**Evidencia:** Capturas de la asignación inicial, la reasignación y la consulta de responsables.
+- El estado presentado corresponde al estado almacenado.
+- El responsable identificado corresponde a la asignación vigente.
+- La información se presenta de acuerdo con los permisos de cada rol.
+- Los cambios autorizados de estado se reflejan en las consultas posteriores.
+
+**Resultado obtenido:** Pendiente de ejecución.
+
+**Estado:** Pendiente.
+
+**Evidencia:** Capturas de las consultas realizadas desde los roles correspondientes.
 
 ---
 
-### PF-08. Registro de intervención técnica
+### PF-08. Consulta del historial de intervenciones
 
-**Condición de aceptación:** CA-04.  
-**Requisitos relacionados:** RF-16, RF-17 y RF-21.  
-**Objetivo:** comprobar que el técnico asignado puede registrar una intervención y que esta queda asociada a la solicitud.
+**Criterio de aceptación:** CA-04.
+
+**Requisitos relacionados:** RF-16, RF-17 y RF-21.
+
+**Objetivo:** comprobar que el sistema conserva las intervenciones realizadas durante la atención de una solicitud y permite consultarlas respetando las reglas de visibilidad.
 
 **Precondiciones:**
-- Existe una solicitud asignada al técnico A.
-- El técnico A inició sesión.
-- La solicitud se encuentra en un estado que permite registrar intervenciones.
+
+- Existe una solicitud con intervenciones registradas.
+- Las intervenciones están asociadas a la solicitud y a sus responsables.
+- Se dispone de cuentas de solicitante, técnico y coordinador.
 
 **Datos de entrada:**
+
 - Identificador de la solicitud.
-- Descripción de la intervención.
-- Información adicional solicitada por el formulario, cuando corresponda.
+- Intervenciones registradas.
+- Clasificación de visibilidad de las intervenciones.
 
 **Pasos:**
-1. Iniciar sesión como técnico A.
-2. Consultar las solicitudes asignadas.
-3. Abrir el detalle de una solicitud.
-4. Registrar una intervención con información válida.
-5. Consultar nuevamente las intervenciones de la solicitud.
-6. Comprobar que la intervención aparece asociada al caso y al técnico.
-7. Intentar consultar la intervención desde una cuenta sin permisos.
+
+1. Iniciar sesión como técnico autorizado.
+2. Consultar una solicitud asignada.
+3. Abrir el historial de intervenciones.
+4. Verificar que las intervenciones registradas aparecen asociadas al caso.
+5. Iniciar sesión como coordinador.
+6. Consultar el historial de la misma solicitud.
+7. Iniciar sesión como solicitante propietario.
+8. Consultar las intervenciones visibles para el solicitante.
+9. Comprobar que las intervenciones internas no se muestran al solicitante.
 
 **Resultado esperado:**
-- El técnico asignado puede registrar la intervención.
-- La intervención queda persistida y vinculada a la solicitud y al responsable.
-- La consulta respeta las reglas de visibilidad.
-- Los usuarios no autorizados no pueden consultar información restringida.
 
-**Resultado obtenido:** Pendiente de ejecución.  
-**Estado:** Pendiente.  
-**Evidencia:** Captura del registro y de la consulta de la intervención.
+- Las intervenciones permanecen almacenadas.
+- Las intervenciones se relacionan con la solicitud correspondiente.
+- Se conserva la información del responsable y la fecha.
+- La consulta respeta el orden y la información disponible.
+- Las intervenciones internas solo pueden consultarse por el personal autorizado.
+- El solicitante únicamente puede consultar las intervenciones visibles para su rol.
+
+**Resultado obtenido:** Pendiente de ejecución.
+
+**Estado:** Pendiente.
+
+**Evidencia:** Capturas del historial consultado desde los diferentes roles.
 
 ---
 
-### PF-09. Solicitud y respuesta de información adicional
+### PF-09. Cierre de un caso y consulta del resultado
 
-**Condición de aceptación:** CA-04.  
-**Requisito relacionado:** RF-18.  
-**Objetivo:** verificar que el personal autorizado puede solicitar información adicional y que el solicitante puede responder.
+**Criterio de aceptación:** CA-05.
 
-**Precondiciones:**
-- Existe una solicitud asignada.
-- El técnico o coordinador tiene acceso autorizado.
-- El solicitante propietario de la solicitud puede iniciar sesión.
+**Requisitos relacionados:** RF-07, RF-19 y RF-20.
 
-**Datos de entrada:**
-- Solicitud existente.
-- Pregunta o descripción de la información requerida.
-- Respuesta del solicitante.
-
-**Pasos:**
-1. Iniciar sesión como técnico asignado o coordinador autorizado.
-2. Abrir la solicitud correspondiente.
-3. Registrar una petición de información adicional.
-4. Consultar las peticiones asociadas a la solicitud.
-5. Cerrar sesión e iniciar como solicitante propietario.
-6. Consultar la petición recibida.
-7. Registrar una respuesta.
-8. Consultar nuevamente la petición y verificar que la respuesta quedó asociada.
-
-**Resultado esperado:**
-- El personal autorizado puede registrar una petición.
-- El solicitante propietario puede consultar y responder la petición.
-- La respuesta queda vinculada a la petición y a la solicitud.
-- Los usuarios ajenos no pueden responder o consultar información sin autorización.
-
-**Resultado obtenido:** Pendiente de ejecución.  
-**Estado:** Pendiente.  
-**Evidencia:** Capturas de la petición, su consulta y la respuesta registrada.
-
----
-
-### PF-10. Registro de solución y cierre
-
-**Condición de aceptación:** CA-05.  
-**Requisitos relacionados:** RF-19 y RF-20.  
-**Objetivo:** comprobar que el técnico puede documentar la solución y que el coordinador puede revisar y cerrar la solicitud.
+**Objetivo:** comprobar que una solicitud puede cerrarse después de registrar la solución y que el solicitante puede consultar el resultado de la atención.
 
 **Precondiciones:**
-- Existe una solicitud en atención.
-- La solicitud está asignada a un técnico.
-- El técnico y el coordinador tienen cuentas activas.
+
+- Existe una solicitud asignada a un técnico.
+- La solicitud se encuentra en un estado que permite registrar una solución.
+- Existe una cuenta activa de técnico.
+- Existe una cuenta activa de coordinador.
+- Existe una cuenta de solicitante propietario.
 
 **Datos de entrada:**
+
 - Identificador de la solicitud.
 - Descripción de la solución.
-- Información de cierre requerida por el sistema.
+- Tipo de cierre correspondiente.
+- Información adicional requerida para el cierre.
 
 **Pasos:**
+
 1. Iniciar sesión como técnico asignado.
-2. Abrir la solicitud.
-3. Registrar la solución con una descripción válida.
-4. Consultar el detalle y verificar que la solución quedó registrada.
+2. Consultar la solicitud.
+3. Registrar la solución aplicada.
+4. Verificar que la solicitud pasa al estado `Resuelto`, de acuerdo con las reglas de transición.
 5. Iniciar sesión como coordinador.
 6. Consultar la solicitud resuelta.
-7. Revisar la información de la solución.
-8. Ejecutar el cierre permitido.
-9. Consultar nuevamente la solicitud y verificar su estado final.
-10. Iniciar sesión como solicitante propietario y consultar el resultado.
+7. Revisar la solución registrada.
+8. Ejecutar el cierre de la solicitud.
+9. Consultar nuevamente el estado de la solicitud.
+10. Iniciar sesión como solicitante propietario.
+11. Consultar el resultado y la finalización del caso.
 
 **Resultado esperado:**
-- El técnico puede registrar la solución de la solicitud asignada.
-- El coordinador puede revisar la solución y cerrar la solicitud conforme a las reglas.
-- El estado final y el resultado de atención quedan persistidos.
-- El solicitante puede consultar el resultado de su caso cerrado.
 
-**Resultado obtenido:** Pendiente de ejecución.  
-**Estado:** Pendiente.  
-**Evidencia:** Capturas del registro de solución, cierre y consulta del resultado por el solicitante.
+- El técnico puede registrar la solución de una solicitud asignada.
+- La solución queda almacenada y asociada al caso.
+- El coordinador puede revisar y cerrar la solicitud.
+- La solicitud queda en estado `Cerrado`.
+- Se conserva la información correspondiente al cierre.
+- El solicitante puede consultar el resultado de la atención después del cierre.
+- La solicitud cerrada conserva su información histórica para consulta autorizada.
+
+**Resultado obtenido:** Pendiente de ejecución.
+
+**Estado:** Pendiente.
+
+**Evidencia:** Capturas del registro de solución, cierre y consulta del resultado por parte del solicitante.
 
 ---
 
-### PF-11. Cancelación y cierre administrativo
+### PF-10. Consulta consolidada de coordinación
 
-**Condición de aceptación:** CA-05.  
-**Requisitos relacionados:** RF-15 y RF-20.  
-**Objetivo:** comprobar que la cancelación y el cierre administrativo respetan los permisos, estados y motivos establecidos.
+**Criterio de aceptación:** CA-06.
 
-**Precondiciones:**
-- Existen solicitudes en estados que permitan probar los diferentes escenarios.
-- Hay cuentas de solicitante y coordinador.
-- Se conocen las reglas de cancelación y cierre definidas en el sistema.
+**Requisito relacionado:** RF-29.
 
-**Datos de entrada:**
-- Solicitud cancelable por el solicitante.
-- Solicitud que pueda recibir cierre administrativo.
-- Motivo correspondiente, cuando sea obligatorio.
-
-**Pasos:**
-1. Iniciar sesión como solicitante propietario.
-2. Seleccionar una solicitud cuyo estado permita cancelación.
-3. Ejecutar la cancelación con la información requerida.
-4. Consultar el estado actualizado.
-5. Iniciar sesión como coordinador.
-6. Seleccionar una solicitud que cumpla las condiciones para cierre administrativo.
-7. Registrar el motivo requerido y ejecutar el cierre.
-8. Consultar el estado final y el historial.
-9. Intentar realizar una operación no permitida sobre una solicitud cerrada.
-
-**Resultado esperado:**
-- El solicitante puede cancelar únicamente las solicitudes permitidas.
-- El coordinador puede realizar cierres administrativos justificados y autorizados.
-- Los motivos y cambios quedan registrados cuando corresponda.
-- Una solicitud cerrada no admite nuevas operaciones operativas no permitidas.
-- La información histórica permanece disponible para consulta autorizada.
-
-**Resultado obtenido:** Pendiente de ejecución.  
-**Estado:** Pendiente.  
-**Evidencia:** Capturas de la cancelación, cierre administrativo, historial y rechazo de una operación no permitida.
-
----
-
-### PF-12. Consulta del consolidado del coordinador
-
-**Condición de aceptación:** CA-06.  
-**Requisito relacionado:** RF-29.  
-**Objetivo:** comprobar que el coordinador puede consultar información consolidada sobre las solicitudes y su atención.
+**Objetivo:** comprobar que el coordinador puede consultar información consolidada de varias solicitudes, incluyendo sus estados y responsables.
 
 **Precondiciones:**
+
 - Existen varias solicitudes registradas.
-- Las solicitudes tienen diferentes estados, prioridades y categorías.
+- Las solicitudes tienen diferentes estados.
 - Existen solicitudes asignadas a diferentes técnicos.
-- El coordinador inició sesión.
+- Existe una cuenta activa de coordinador.
 
 **Datos de entrada:**
-- Solicitudes de prueba con diferentes estados.
-- Diferentes categorías y prioridades.
-- Responsables asignados.
+
+- Conjunto de solicitudes de prueba.
+- Estados de las solicitudes.
+- Técnicos responsables.
+- Información estadística disponible en el sistema.
 
 **Pasos:**
+
 1. Iniciar sesión como coordinador.
-2. Abrir la consulta de estadísticas o consolidado.
-3. Consultar la información general de solicitudes.
-4. Comprobar los datos agrupados por estado.
-5. Verificar los datos de categorías, prioridades y responsables cuando estén disponibles.
-6. Comparar los resultados con las solicitudes registradas.
-7. Intentar consultar la información desde un rol que no tenga permisos de coordinación.
+2. Abrir la consulta de estadísticas o información consolidada.
+3. Consultar la información general de las solicitudes.
+4. Verificar la información agrupada por estado.
+5. Consultar los responsables de las solicitudes, cuando la funcionalidad lo permita.
+6. Comparar los resultados con los registros existentes.
+7. Comprobar que los datos presentados corresponden a las solicitudes almacenadas.
 
 **Resultado esperado:**
-- El coordinador puede consultar información consolidada de varias solicitudes.
-- Las cantidades y agrupaciones corresponden a los datos almacenados.
-- Los datos de estado, prioridad, categoría y responsables son coherentes con los registros existentes.
-- Los usuarios sin permisos no pueden acceder a la consulta restringida.
 
-**Resultado obtenido:** Pendiente de ejecución.  
-**Estado:** Pendiente.  
-**Evidencia:** Captura del consolidado y de la comparación con las solicitudes registradas.
+- El coordinador puede consultar información de varios casos.
+- Se presentan los estados correspondientes.
+- Se puede identificar a los responsables de los casos.
+- Los datos consolidados coinciden con la información almacenada.
+- La consulta está restringida a los roles autorizados.
+
+**Resultado obtenido:** Pendiente de ejecución.
+
+**Estado:** Pendiente.
+
+**Evidencia:** Captura de la consulta consolidada y de los registros utilizados para comprobar sus resultados.
+
+---
+
+### PF-11. Verificación de persistencia e integridad de relaciones
+
+**Criterios de aceptación:** CA-01, CA-02 y CA-04.
+
+**Requisitos relacionados:** RF-06, RF-11, RF-12, RF-16, RF-17 y RF-28.
+
+**Objetivo:** comprobar que los registros del sistema se conservan en la base de datos y mantienen correctamente sus relaciones.
+
+**Precondiciones:**
+
+- PostgreSQL está disponible.
+- El backend está conectado a la base de datos.
+- Existen solicitudes, usuarios, asignaciones e intervenciones de prueba.
+- Se dispone de acceso autorizado para consultar la información de la base de datos.
+
+**Datos de entrada:**
+
+- Una solicitud registrada.
+- El usuario solicitante.
+- El técnico responsable.
+- Una asignación.
+- Una o varias intervenciones.
+- Registros del historial relacionados con las operaciones realizadas.
+
+**Pasos:**
+
+1. Registrar una solicitud desde la aplicación.
+2. Consultar la solicitud mediante la API.
+3. Verificar que el registro existe en la base de datos.
+4. Comprobar que la solicitud está relacionada con el solicitante correcto.
+5. Asignar la solicitud a un técnico.
+6. Verificar que la asignación se conserva correctamente.
+7. Registrar una intervención.
+8. Consultar la intervención mediante la API.
+9. Verificar que la intervención está relacionada con la solicitud y el responsable correspondiente.
+10. Consultar los registros del historial relacionados con las operaciones realizadas.
+11. Comparar los datos obtenidos desde la aplicación con los almacenados en PostgreSQL.
+
+**Resultado esperado:**
+
+- Las solicitudes se conservan después de registrarse.
+- Las relaciones entre solicitudes y solicitantes son correctas.
+- Las asignaciones conservan la relación con el técnico correspondiente.
+- Las intervenciones quedan asociadas a la solicitud y al responsable.
+- El historial conserva los cambios que deben registrarse.
+- No se presentan relaciones inconsistentes o registros huérfanos.
+
+**Resultado obtenido:** Pendiente de ejecución.
+
+**Estado:** Pendiente.
+
+**Evidencia:** Capturas de las consultas de la API y de las verificaciones realizadas en PostgreSQL.
+
+---
+
+### PF-12. Verificación de integración entre interfaz, API y base de datos
+
+**Criterios de aceptación:** CA-01, CA-02, CA-03, CA-04, CA-05 y CA-06.
+
+**Requisitos relacionados:** RF-01, RF-02, RF-06, RF-07, RF-09, RF-10, RF-11, RF-13, RF-14, RF-16, RF-19, RF-20 y RF-29.
+
+**Objetivo:** comprobar que la interfaz web, la API REST y la base de datos trabajan de forma integrada durante un flujo de atención de soporte.
+
+**Precondiciones:**
+
+- El frontend está en ejecución.
+- El backend está en ejecución.
+- PostgreSQL está disponible.
+- El frontend está configurado para comunicarse con el backend.
+- Existen cuentas activas de solicitante, técnico y coordinador.
+
+**Datos de entrada:**
+
+- Credenciales de los usuarios de prueba.
+- Información válida para registrar una solicitud.
+- Categoría y prioridad válidas.
+- Técnico responsable.
+- Descripción de una intervención.
+- Descripción de una solución.
+
+**Pasos:**
+
+1. Abrir la interfaz web.
+2. Iniciar sesión como solicitante.
+3. Registrar una solicitud desde el frontend.
+4. Comprobar que la interfaz muestra el resultado de la operación.
+5. Verificar que la API recibió y procesó la solicitud.
+6. Consultar la base de datos y comprobar que el registro existe.
+7. Iniciar sesión como coordinador.
+8. Consultar y evaluar la solicitud.
+9. Asignarla a un técnico.
+10. Iniciar sesión como técnico.
+11. Consultar la solicitud asignada.
+12. Registrar una intervención.
+13. Registrar la solución cuando corresponda.
+14. Iniciar sesión como coordinador y cerrar la solicitud.
+15. Iniciar sesión como solicitante y consultar el resultado.
+16. Consultar la información consolidada desde la cuenta de coordinador.
+
+**Resultado esperado:**
+
+- El frontend se comunica correctamente con el backend.
+- La API procesa las operaciones y aplica las reglas de negocio.
+- PostgreSQL conserva los registros y sus relaciones.
+- Los cambios realizados se reflejan en las consultas posteriores.
+- Los roles pueden realizar las operaciones autorizadas.
+- El flujo completo mantiene la coherencia de la información.
+- El resultado final puede consultarse desde la interfaz.
+
+**Resultado obtenido:** Pendiente de ejecución.
+
+**Estado:** Pendiente.
+
+**Evidencia:** Capturas de las operaciones realizadas desde el frontend, respuestas de la API y verificaciones de persistencia en PostgreSQL.
 
 ---
 
 ## 5. Resumen de ejecución
 
-Esta tabla se actualizará después de ejecutar las pruebas.
+Esta tabla se actualizará después de ejecutar las pruebas funcionales.
 
 | ID | Prueba | Estado | Evidencia |
 |---|---|---|---|
-| PF-01 | Inicio de sesión | Pendiente | Por adjuntar |
-| PF-02 | Acceso según el rol | Pendiente | Por adjuntar |
-| PF-03 | Creación de usuarios | Pendiente | Por adjuntar |
-| PF-04 | Registro de solicitudes | Pendiente | Por adjuntar |
-| PF-05 | Consulta según el rol | Pendiente | Por adjuntar |
-| PF-06 | Evaluación y clasificación | Pendiente | Por adjuntar |
-| PF-07 | Asignación y reasignación | Pendiente | Por adjuntar |
-| PF-08 | Registro de intervención | Pendiente | Por adjuntar |
-| PF-09 | Solicitud y respuesta de información | Pendiente | Por adjuntar |
-| PF-10 | Registro de solución y cierre | Pendiente | Por adjuntar |
-| PF-11 | Cancelación y cierre administrativo | Pendiente | Por adjuntar |
-| PF-12 | Consolidado del coordinador | Pendiente | Por adjuntar |
+| PF-01 | Registro válido de un caso de soporte | Pendiente | Por adjuntar |
+| PF-02 | Registro de un caso con datos inválidos | Pendiente | Por adjuntar |
+| PF-03 | Consulta de un caso existente | Pendiente | Por adjuntar |
+| PF-04 | Consulta de un caso inexistente | Pendiente | Por adjuntar |
+| PF-05 | Gestión de un caso por personal autorizado | Pendiente | Por adjuntar |
+| PF-06 | Intento de gestión por un actor no autorizado | Pendiente | Por adjuntar |
+| PF-07 | Consulta del estado y responsable de un caso | Pendiente | Por adjuntar |
+| PF-08 | Consulta del historial de intervenciones | Pendiente | Por adjuntar |
+| PF-09 | Cierre de un caso y consulta del resultado | Pendiente | Por adjuntar |
+| PF-10 | Consulta consolidada de coordinación | Pendiente | Por adjuntar |
+| PF-11 | Verificación de persistencia e integridad de relaciones | Pendiente | Por adjuntar |
+| PF-12 | Verificación de integración entre interfaz, API y base de datos | Pendiente | Por adjuntar |
 
-**Total de pruebas:** 12  
-**Aprobadas:** 0  
-**Fallidas:** 0  
-**Bloqueadas:** 0  
-**Pendientes:** 12
+### 5.1. Contadores
 
-Los contadores se actualizarán únicamente con los resultados reales de ejecución.
+Los siguientes valores representan el estado inicial del plan de pruebas, no resultados de una ejecución.
+
+| Indicador | Cantidad |
+|---|---:|
+| Total de pruebas | 12 |
+| Aprobadas | 0 |
+| Fallidas | 0 |
+| Bloqueadas | 0 |
+| Pendientes | 12 |
+
+Los contadores deberán actualizarse únicamente con resultados reales de ejecución.
 
 ## 6. Evidencias
 
-Las capturas y registros de las pruebas se conservarán en la siguiente estructura:
+Las capturas y registros de las pruebas se conservarán en la carpeta `evidencias/`.
+
+Se propone la siguiente estructura:
 
 ```text
 evidencias/
@@ -572,18 +757,41 @@ evidencias/
 └── PF-12/
 ```
 
-Cada carpeta debe contener evidencia suficiente para identificar la operación ejecutada y su resultado. Se deben ocultar contraseñas, tokens, claves y datos personales reales.
+Cada carpeta debe contener evidencia suficiente para identificar:
+
+- La prueba ejecutada.
+- El usuario o rol utilizado.
+- La operación realizada.
+- Los datos relevantes de entrada.
+- El resultado obtenido.
+- La fecha de ejecución.
+
+Las evidencias pueden incluir capturas de la interfaz, solicitudes y respuestas HTTP, registros de ejecución y consultas de PostgreSQL.
+
+Se deben ocultar contraseñas, tokens, claves y datos personales reales.
 
 ## 7. Relación con la matriz de trazabilidad
 
-Los resultados de este documento complementan `docs/trazabilidad.md`.
+Los resultados de este documento complementan la matriz definida en `docs/trazabilidad.md`.
 
-Una condición de aceptación no se marcará como demostrada únicamente porque exista un endpoint o una prueba automatizada. Se debe comprobar el flujo funcional correspondiente y conservar evidencia reproducible.
+La relación entre las pruebas funcionales y las condiciones de aceptación es:
 
-La matriz de trazabilidad deberá actualizarse cuando las pruebas se ejecuten, indicando los identificadores PF correspondientes, el resultado y la evidencia disponible.
+| Condición de aceptación | Pruebas relacionadas |
+|---|---|
+| CA-01. Registro de casos de soporte | PF-01, PF-02, PF-03, PF-11 y PF-12 |
+| CA-02. Evaluación y gestión de casos | PF-05, PF-06, PF-11 y PF-12 |
+| CA-03. Consulta del estado y responsable | PF-03, PF-04, PF-07 y PF-12 |
+| CA-04. Historial de intervenciones | PF-08, PF-11 y PF-12 |
+| CA-05. Consulta del resultado y finalización | PF-03, PF-09 y PF-12 |
+| CA-06. Consulta consolidada de coordinación | PF-10 y PF-12 |
+
+Una condición de aceptación no se marcará como demostrada únicamente porque exista un endpoint o una prueba automatizada.
+
+Se debe comprobar el flujo funcional correspondiente y conservar evidencia reproducible.
 
 ## 8. Control de cambios
 
 | Versión | Descripción |
 |---|---|
-| 1.0 | Creación del documento con los 12 casos de prueba funcionales definidos para el proyecto. |
+| 1.0 | Creación del documento con los casos de prueba funcionales iniciales. |
+| 2.0 | Ajuste de las doce pruebas funcionales para alinearlas con la Actividad 6 de `proyecto2.md` y las condiciones de aceptación CA-01 a CA-06. |

@@ -2,35 +2,49 @@
 
 ## 1. Objetivo
 
-Esta matriz relaciona las seis condiciones de aceptación establecidas en `proyecto2.md` con los requisitos funcionales, los componentes del sistema, las pruebas automatizadas y la evidencia de integración.
+Esta matriz relaciona las seis condiciones de aceptación establecidas en `proyecto2.md` con los requisitos funcionales aprobados, los componentes de implementación, los Pull Requests y las pruebas correspondientes.
 
-La matriz permite identificar qué funcionalidades contribuyen al cumplimiento de cada condición y qué validaciones hacen falta para demostrar el funcionamiento completo del sistema.
+Su propósito es permitir la identificación y verificación de cada funcionalidad, desde el requisito aprobado hasta su implementación y validación.
+
+La matriz se debe mantener actualizada conforme se integren los requisitos funcionales y se ejecuten las pruebas del proyecto.
 
 ### 1.1. Estados utilizados
 
-- **Implementado:** existe código correspondiente en la rama integrada.
-- **Prueba automatizada:** existe un archivo de pruebas para validar el comportamiento del requisito.
-- **Pendiente de evidencia funcional:** falta documentar la demostración reproducible y su evidencia.
-- **Pendiente de integración:** el componente todavía no está integrado en la rama que se está evaluando.
+Los siguientes estados permiten identificar el nivel de avance de cada elemento:
 
-La existencia de código o pruebas automatizadas no significa, por sí sola, que una condición de aceptación esté completamente demostrada.
+- **Pendiente de verificar:** la implementación, integración o prueba requiere comprobación.
+- **Implementado:** existe una implementación identificable en el repositorio.
+- **Pendiente de integración:** el desarrollo todavía no se ha incorporado a la rama correspondiente.
+- **Pendiente de prueba funcional:** falta ejecutar y documentar la prueba funcional.
+- **Pendiente de evidencia:** falta adjuntar la evidencia que demuestra el resultado.
+- **Verificado:** existe evidencia suficiente de implementación y validación.
 
-## 2. Matriz de trazabilidad
+La existencia de código o de una prueba automatizada no demuestra por sí sola el cumplimiento completo de una condición de aceptación.
 
-| Condición de aceptación | Requisitos funcionales relacionados | Implementación (rutas principales) | Pruebas automatizadas | Estado |
-|---|---|---|---|---|
-| **CA-01. Reportar un incidente o solicitar soporte tecnológico.** Se debe registrar un caso de forma persistente y poder recuperarlo. | RF-01, RF-02, RF-06, RF-07, RF-08. | `app/api/auth.py`, `app/api/solicitudes.py`, `app/api/usuarios.py`; servicios `autenticacion.py`, `solicitudes.py`, `adjuntos_solicitudes.py`; modelos `usuario.py`, `solicitud.py`, `adjunto.py`. | `test_rf01_inicio_sesion.py`, `test_rf06_crear_solicitud.py`, `test_rf07_consultar_solicitudes.py`, `test_rf08_adjuntos_solicitudes.py`. | Implementado y con pruebas automatizadas. Pendiente documentar la demostración funcional completa. |
-| **CA-02. El personal autorizado puede evaluar y gestionar el caso.** Las actuaciones deben quedar asociadas al caso y al responsable correspondiente. | RF-02, RF-03, RF-04, RF-05, RF-09, RF-10, RF-11, RF-12, RF-15, RF-16, RF-18, RF-19, RF-20. | `app/api/usuarios.py`, `app/api/categorias.py`, `app/api/asignaciones.py`, `app/api/solicitudes.py`, `app/api/cierres.py`, `app/api/peticiones_informacion.py`; servicios `usuarios.py`, `categorias.py`, `asignaciones.py`, `solicitudes.py`, `intervenciones.py`, `solicitudes_informacion.py`, `cierres.py`. Modelos `usuario.py`, `solicitud.py`, `asignacion.py`, `intervencion.py`, `solicitud_informacion.py`, `respuesta_informacion.py`. | `test_rf03_gestion_usuarios.py`, `test_rf04_cambio_restablecimiento_contrasena.py`, `test_rf09_evaluacion_clasificacion.py`, `test_rf11_12_asignacion_tecnicos.py`, `test_rf15_20_cancelacion_cierre.py`, `test_rf16_registrar_intervenciones.py`, `test_rf18_solicitar_informacion.py`, `test_rf18_responder_informacion.py`, `test_rf19_registrar_solucion.py`. | Implementado y con pruebas automatizadas. Pendiente documentar la demostración funcional del proceso de gestión. |
-| **CA-03. Identificar al responsable y consultar el estado del caso durante su atención.** Se deben recuperar datos coherentes de responsable y estado. | RF-02, RF-07, RF-11, RF-12, RF-13, RF-14, RF-17, RF-21. | `app/api/asignaciones.py`, `app/api/solicitudes.py`; servicios `asignaciones.py`, `solicitudes.py`, `intervenciones.py`; modelos `asignacion.py`, `solicitud.py`, `usuario.py`, `historial_cambio.py`; esquemas `asignacion.py`, `solicitud.py`. | `test_rf07_consultar_solicitudes.py`, `test_rf11_12_asignacion_tecnicos.py`, `test_rf13_solicitudes_asignadas.py`, `test_rf14_actualizar_estado.py`, `test_rf17_visibilidad_intervenciones.py`. | Implementado y con pruebas automatizadas. Pendiente documentar la comprobación conjunta de responsable y estado. |
-| **CA-04. Conservar el historial de intervenciones de soporte.** Se deben consultar las actuaciones realizadas sobre un caso en su secuencia correspondiente. | RF-16, RF-17, RF-18, RF-19, RF-21, RF-22, RF-23, RF-24, RF-25, RF-26, RF-28. | `app/api/solicitudes.py`, `app/api/mensajes.py`, `app/api/peticiones_informacion.py`, `app/api/historial.py`; servicios `intervenciones.py`, `mensajes.py`, `solicitudes_informacion.py`, `adjuntos_mensajes.py`, `adjuntos.py`, `historial.py`; modelos `intervencion.py`, `mensaje.py`, `adjunto.py`, `historial_cambio.py`. | `test_rf16_registrar_intervenciones.py`, `test_rf17_visibilidad_intervenciones.py`, `test_rf18_solicitar_informacion.py`, `test_rf18_responder_informacion.py`, `test_rf19_registrar_solucion.py`, `test_rf22_23_26_mensajes.py`, `test_rf24_adjuntos_mensajes.py`, `test_rf25_adjuntos_intervenciones.py`, `test_rf28_historial.py`. | Implementado y con pruebas automatizadas. Pendiente documentar la demostración de consulta cronológica del historial. |
-| **CA-05. Consultar el resultado y la finalización del caso.** Se debe visualizar el resultado de la atención de un caso cerrado. | RF-07, RF-08, RF-14, RF-15, RF-17, RF-19, RF-20, RF-24, RF-25, RF-26, RF-28. | `app/api/solicitudes.py`, `app/api/cierres.py`, `app/api/mensajes.py`, `app/api/historial.py`; servicios `solicitudes.py`, `cierres.py`, `intervenciones.py`, `adjuntos_solicitudes.py`, `adjuntos_mensajes.py`, `adjuntos.py`, `historial.py`; modelos `solicitud.py`, `adjunto.py`, `historial_cambio.py`. | `test_rf07_consultar_solicitudes.py`, `test_rf14_actualizar_estado.py`, `test_rf15_20_cancelacion_cierre.py`, `test_rf19_registrar_solucion.py`, `test_rf24_adjuntos_mensajes.py`, `test_rf25_adjuntos_intervenciones.py`, `test_rf28_historial.py`. | Implementado y con pruebas automatizadas. Pendiente documentar la consulta del resultado por parte del solicitante después del cierre. |
-| **CA-06. La coordinación puede consultar información consolidada sobre la atención.** Se deben mostrar varios casos, sus estados y responsables. | RF-02, RF-07, RF-11, RF-12, RF-27, RF-28, RF-29. | `app/api/solicitudes.py`, `app/api/asignaciones.py`, `app/api/notificaciones.py`, `app/api/historial.py`, `app/api/estadisticas.py`; servicios `solicitudes.py`, `asignaciones.py`, `notificaciones.py`, `historial.py`, `estadisticas.py`; modelos `solicitud.py`, `asignacion.py`, `notificacion.py`, `historial_cambio.py`. | `test_rf07_consultar_solicitudes.py`, `test_rf11_12_asignacion_tecnicos.py`, `test_rf27_notificaciones.py`, `test_rf28_historial.py`, `test_rf29_estadisticas.py`. | Implementado y con pruebas automatizadas. Pendiente documentar la demostración consolidada desde la perspectiva del coordinador. |
+## 2. Matriz de trazabilidad de las condiciones de aceptación
 
-**Nota:** Las rutas anteriores son relativas a `apps/backend`. Los requisitos que comparten archivos de pruebas se validan mediante esos archivos; no se presupone que cada requisito tenga un archivo independiente.
+Las condiciones de aceptación corresponden a las seis condiciones obligatorias definidas en `proyecto2.md`.
+
+| Condición de aceptación | Requisitos funcionales relacionados | Implementación (rutas principales) | Pull Request | Prueba funcional relacionada | Estado |
+|---|---|---|---|---|---|
+| **CA-01. Registro de casos de soporte.** Un usuario solicitante puede reportar un incidente o solicitar soporte tecnológico mediante la plataforma. El sistema registra el caso de forma persistente y permite recuperarlo posteriormente. | RF-06 | `apps/backend/app/api/solicitudes.py`, `apps/backend/app/services/solicitudes.py`. Modelos relacionados con solicitudes y usuarios. | Pendiente de identificar. | PF-01, PF-02, PF-03, PF-11 y PF-12. | Pendiente de consolidar evidencia funcional. |
+| **CA-02. Evaluación y gestión de casos.** El personal autorizado puede evaluar y gestionar un caso mediante las actuaciones permitidas para su rol. Las acciones deben quedar asociadas al caso y al responsable correspondiente. | RF-09, RF-10, RF-11, RF-12, RF-14 | `apps/backend/app/api/solicitudes.py`, `apps/backend/app/api/asignaciones.py`, `apps/backend/app/services/solicitudes.py`, `apps/backend/app/services/asignaciones.py`. | Pendiente de identificar. | PF-05, PF-06, PF-11 y PF-12. | Pendiente de consolidar evidencia funcional. |
+| **CA-03. Consulta del estado y responsable.** El sistema permite identificar quién es responsable de un caso y consultar su estado durante el proceso de atención. | RF-07, RF-11, RF-12, RF-13, RF-14 | `apps/backend/app/api/solicitudes.py`, `apps/backend/app/api/asignaciones.py`, `apps/backend/app/services/solicitudes.py`, `apps/backend/app/services/asignaciones.py`. | Pendiente de identificar. | PF-03, PF-04, PF-07 y PF-12. | Pendiente de consolidar evidencia funcional. |
+| **CA-04. Historial de intervenciones.** El sistema conserva las intervenciones realizadas durante la atención de un caso y permite consultarlas en la secuencia correspondiente, respetando los permisos y las reglas de visibilidad. | RF-16, RF-17, RF-21 | `apps/backend/app/api/solicitudes.py`, `apps/backend/app/services/intervenciones.py`. | Pendiente de identificar. | PF-08, PF-11 y PF-12. | Pendiente de consolidar evidencia funcional. |
+| **CA-05. Consulta del resultado y finalización.** El solicitante puede consultar el resultado de la atención y la finalización de su caso. El resultado debe permanecer disponible para consulta autorizada. | RF-07, RF-19, RF-20 | `apps/backend/app/api/solicitudes.py`, `apps/backend/app/api/cierres.py`, `apps/backend/app/services/solicitudes.py`, `apps/backend/app/services/cierres.py`. | Pendiente de identificar. | PF-03, PF-09 y PF-12. | Pendiente de consolidar evidencia funcional. |
+| **CA-06. Consulta consolidada de coordinación.** El coordinador puede consultar información consolidada de varios casos, incluyendo sus estados y responsables. | RF-29 | `apps/backend/app/api/estadisticas.py`, `apps/backend/app/services/estadisticas.py`. | Pendiente de identificar. | PF-10 y PF-12. | Pendiente de consolidar evidencia funcional. |
+
+**Nota sobre las rutas:** las rutas de implementación se presentan como referencias registradas para los componentes del backend y deben cotejarse con los archivos existentes en la rama evaluada. No se consideran una confirmación de que todos los componentes estén integrados.
+
+**Nota sobre los Pull Requests:** se debe registrar el número o enlace real del Pull Request correspondiente a cada requisito o integración. No se asignan números sin haberlos comprobado en GitHub.
 
 ## 3. Trazabilidad de los requisitos funcionales
 
-| Requisito | Funcionalidad | Implementación principal | Prueba automatizada |
+La siguiente tabla relaciona cada requisito funcional con su implementación principal y su prueba automatizada de referencia.
+
+Las rutas y nombres de pruebas corresponden al registro de desarrollo del proyecto. Su existencia y estado actual deben verificarse en el repositorio antes de considerar un requisito completamente validado.
+
+| Requisito | Funcionalidad | Implementación principal | Prueba automatizada de referencia |
 |---|---|---|---|
 | RF-01 | Inicio de sesión | `api/auth.py`, `services/autenticacion.py` | `test_rf01_inicio_sesion.py` |
 | RF-02 | Control de acceso por roles | `api/dependencies.py`, `api/permisos.py` y dependencias de los módulos | Pruebas de permisos de los módulos correspondientes |
@@ -62,70 +76,144 @@ La existencia de código o pruebas automatizadas no significa, por sí sola, que
 | RF-28 | Historial de cambios | `api/historial.py`, `services/historial.py` | `test_rf28_historial.py` |
 | RF-29 | Consulta de estadísticas | `api/estadisticas.py`, `services/estadisticas.py` | `test_rf29_estadisticas.py` |
 
+**Consideraciones:**
+
+- Las rutas anteriores son relativas a `apps/backend`.
+- Los nombres de las pruebas son referencias para localizar las validaciones correspondientes.
+- Algunos requisitos comparten archivos de pruebas.
+- Las pruebas automatizadas no reemplazan las doce pruebas funcionales exigidas para la entrega.
+- La implementación debe comprobarse contra la rama que se está evaluando.
+
 ## 4. Integración y control de versiones
 
-La integración del backend se encuentra en la rama:
+El desarrollo de SoporteTI se organiza mediante ramas por requisito funcional, de acuerdo con el flujo de trabajo establecido para el proyecto.
 
-`feature/backend-integrado`
+La rama que se documenta en esta versión es:
 
-El desarrollo se organiza mediante ramas por requisito funcional, de acuerdo con el flujo de trabajo establecido para el proyecto.
+`feature/entorno-local-postgresql`
 
-La integración de RF-24, adjuntos en mensajes, quedó incorporada en la rama integrada junto con:
+En esta rama se está trabajando en la configuración del entorno local con PostgreSQL y en la actualización de la documentación correspondiente.
 
-- `apps/backend/app/api/mensajes.py`
-- `apps/backend/app/services/adjuntos_mensajes.py`
-- `apps/backend/tests/test_rf24_adjuntos_mensajes.py`
+Cada requisito funcional debe relacionarse con su rama de desarrollo, su integración y el Pull Request correspondiente, cuando aplique.
 
-La integración se encuentra publicada en la rama `feature/backend-integrado`. El número o enlace del Pull Request debe registrarse cuando se confirme el PR correspondiente; no se asignan números sin evidencia.
+Para mantener el registro de integración se debe documentar:
 
-Para verificar las integraciones y contribuciones individuales se debe consultar el historial de GitHub, los commits, las ramas y los Pull Requests.
+| Elemento | Información que debe registrarse |
+|---|---|
+| Requisito funcional | Identificador RF correspondiente. |
+| Rama de desarrollo | Nombre exacto de la rama utilizada. |
+| Commit | Identificador del commit que contiene la implementación. |
+| Pull Request | Número y enlace del PR, cuando exista. |
+| Rama de destino | Rama en la que se integró el cambio. |
+| Estado | Pendiente, abierto, integrado o cerrado, según corresponda. |
 
-## 5. Validación y evidencias pendientes
+No se considera integrada una funcionalidad únicamente porque exista una rama o un commit. Se debe comprobar su incorporación en la rama de destino.
 
-La suite automatizada del backend se ejecutó antes de la integración de RF-24 con 517 pruebas aprobadas y una advertencia de deprecación de Starlette relacionada con `httpx`. Después de integrar RF-24, sus pruebas específicas registraron 12 casos aprobados. También se informó una ejecución posterior de la suite general sin errores.
+Los números y enlaces de Pull Requests deben obtenerse del historial real del repositorio. No se deben completar con referencias supuestas.
 
-Estos resultados corresponden a pruebas automatizadas del backend y no sustituyen las pruebas funcionales exigidas para la entrega.
+## 5. Validación y evidencias
 
-Queda pendiente consolidar en `docs/pruebas.md` las 12 pruebas funcionales reproducibles solicitadas en `proyecto2.md`, con:
+La validación del proyecto contempla dos niveles complementarios:
 
-1. Identificador y condición de aceptación relacionada.
-2. Requisito funcional validado.
-3. Objetivo de la prueba.
-4. Precondiciones y datos de prueba.
-5. Pasos de ejecución.
-6. Resultado esperado.
-7. Resultado obtenido.
-8. Estado de aprobación o fallo.
-9. Evidencia correspondiente.
+### 5.1. Pruebas automatizadas
 
-También se deben adjuntar capturas o registros en la carpeta `evidencias/`.
+Las pruebas automatizadas permiten verificar el comportamiento de los componentes del backend, las reglas de negocio y las operaciones de la API.
+
+Los resultados deben registrarse después de ejecutar la suite correspondiente en el entorno local.
+
+Se debe documentar:
+
+- Comando utilizado para ejecutar las pruebas.
+- Cantidad de pruebas ejecutadas.
+- Cantidad de pruebas aprobadas.
+- Cantidad de pruebas fallidas.
+- Advertencias presentadas durante la ejecución.
+- Resultado general.
+- Rama y commit sobre los que se ejecutaron.
+
+Los resultados históricos no deben utilizarse como evidencia de una ejecución posterior si no se ha repetido la validación sobre la versión correspondiente.
+
+### 5.2. Pruebas funcionales
+
+De acuerdo con la Actividad 6 de `proyecto2.md`, el proyecto debe contar con doce pruebas funcionales que permitan verificar los servicios web, las reglas de negocio y la integración entre la interfaz, la API REST y la base de datos.
+
+Las doce pruebas requeridas son:
+
+| ID | Prueba funcional | Criterio relacionado |
+|---|---|---|
+| PF-01 | Registro válido de un caso de soporte. | CA-01 |
+| PF-02 | Registro de un caso con datos inválidos. | CA-01 |
+| PF-03 | Consulta de un caso existente. | CA-01, CA-03 y CA-05 |
+| PF-04 | Consulta de un caso inexistente. | CA-03 |
+| PF-05 | Gestión de un caso por personal autorizado. | CA-02 |
+| PF-06 | Intento de gestión por un actor no autorizado. | CA-02 |
+| PF-07 | Consulta del estado y responsable de un caso. | CA-03 |
+| PF-08 | Consulta del historial de intervenciones. | CA-04 |
+| PF-09 | Cierre de un caso y consulta del resultado. | CA-05 |
+| PF-10 | Consulta consolidada de coordinación. | CA-06 |
+| PF-11 | Verificación de persistencia e integridad de relaciones. | CA-01, CA-02 y CA-04 |
+| PF-12 | Verificación de integración entre interfaz, API y base de datos. | CA-01 a CA-06 |
+
+Estas pruebas funcionales no deben confundirse con los archivos de pruebas automatizadas de pytest.
+
+Cada prueba funcional debe registrar:
+
+1. Identificador de la prueba.
+2. Condición de aceptación relacionada.
+3. Requisito funcional validado.
+4. Objetivo de la prueba.
+5. Precondiciones y datos de prueba.
+6. Pasos de ejecución.
+7. Resultado esperado.
+8. Resultado obtenido.
+9. Estado de aprobación o fallo.
+10. Evidencia correspondiente.
+
+Las evidencias pueden incluir capturas de la interfaz, solicitudes y respuestas HTTP, registros de ejecución y consultas que permitan demostrar la persistencia de los datos.
+
+Los resultados y evidencias deben documentarse en `docs/pruebas.md` y conservarse en la carpeta `evidencias/`.
+
+La existencia de esta matriz no significa que las doce pruebas ya estén ejecutadas o aprobadas.
 
 ## 6. Demostración para la sustentación
 
-La demostración debe cubrir un proceso completo de atención:
+La demostración debe cubrir un proceso completo de atención de una solicitud de soporte.
 
 1. Un solicitante inicia sesión y registra una solicitud.
-2. El coordinador consulta, evalúa, clasifica y asigna el caso.
-3. El técnico consulta la solicitud asignada y actualiza su estado.
-4. El técnico registra intervenciones y, cuando corresponda, solicita información adicional.
-5. Los participantes consultan los mensajes y adjuntos asociados al caso.
-6. El técnico registra la solución.
-7. El coordinador revisa y cierra la solicitud.
-8. El solicitante consulta el resultado y la finalización.
-9. El coordinador consulta el historial y las estadísticas de atención.
+2. El coordinador consulta, evalúa y clasifica el caso.
+3. El coordinador asigna el caso a un técnico.
+4. El técnico consulta las solicitudes que tiene asignadas.
+5. El técnico actualiza el estado de la solicitud.
+6. El técnico registra intervenciones y, cuando corresponda, solicita información adicional.
+7. Los participantes autorizados consultan los mensajes y adjuntos asociados al caso.
+8. El técnico registra la solución.
+9. El coordinador revisa y cierra la solicitud.
+10. El solicitante consulta el resultado y la finalización.
+11. El coordinador consulta el historial y las estadísticas de atención.
 
-Durante la demostración se deben comprobar los permisos de cada rol y la persistencia de la información.
+Durante la demostración se deben comprobar:
+
+- Los permisos correspondientes a cada rol.
+- La persistencia de la información.
+- La relación entre las solicitudes y sus responsables.
+- El registro de las intervenciones.
+- La conservación del resultado después del cierre.
+- La consulta consolidada de varios casos.
 
 ## 7. Mantenimiento de la matriz
 
-Esta matriz debe actualizarse cuando se integre o modifique una funcionalidad.
+Esta matriz debe actualizarse cuando se implemente, modifique o integre un requisito funcional.
 
 Para registrar un requisito como completado se debe contar con:
 
 - Implementación identificable en el repositorio.
-- Pruebas automatizadas o funcionales correspondientes.
+- Relación con el requisito funcional aprobado.
+- Referencia a la rama y al commit correspondiente.
+- Pull Request real, cuando corresponda.
+- Prueba automatizada o funcional relacionada.
 - Resultado de ejecución comprobable.
 - Evidencia funcional cuando sea requerida.
-- Referencia al commit o Pull Request de integración, cuando corresponda.
 
-Las condiciones de aceptación solo se marcarán como demostradas cuando exista evidencia suficiente del flujo completo, no únicamente por la existencia de endpoints o pruebas unitarias.
+Las condiciones de aceptación solo se marcarán como demostradas cuando exista evidencia suficiente del flujo completo.
+
+No se debe considerar cumplida una condición únicamente por la existencia de endpoints, archivos de código, ramas o pruebas automatizadas aisladas.
