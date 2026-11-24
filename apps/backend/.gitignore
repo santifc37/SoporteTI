@@ -1,7 +1,7 @@
 # Credenciales locales: nunca subir
 .env
 .env.local
-
+migrar_soporteti_a_local.ps1
 # Entorno virtual de Python
 venv/
 .venv/
