@@ -1,4 +1,4 @@
-# Guía de desarrollo y trabajo colaborativo
+﻿# Guía de desarrollo y trabajo colaborativo
 
 **Proyecto:** SoporteTI  
 **Versión:** 1.0  
@@ -118,8 +118,8 @@ Se utilizará una arquitectura cliente-servidor:
 
 - **Frontend:** React con TypeScript.
 - **Backend:** FastAPI con Python.
-- **Base de datos:** PostgreSQL mediante Supabase.
-- **Almacenamiento de archivos:** Supabase Storage.
+- **Base de datos:** PostgreSQL local.
+- **Almacenamiento de archivos:** Almacenamiento local en disco.
 - **Control de versiones:** Git y GitHub.
 
 La comunicación entre frontend y backend se realizará mediante una API REST.
@@ -210,7 +210,7 @@ Esta estructura es la referencia inicial. Si durante el desarrollo se necesita m
 
 ### 5.3. Base de datos
 
-- Se utilizará una única base de datos compartida en Supabase.
+- Se utilizará una base de datos PostgreSQL local para el entorno de desarrollo.
 - Ambos integrantes deberán trabajar con el mismo esquema.
 - No se crearán tablas duplicadas para representar una misma entidad.
 - Los cambios en tablas, relaciones, restricciones e índices deberán acordarse.

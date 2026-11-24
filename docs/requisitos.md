@@ -214,7 +214,7 @@ Los técnicos podrán consultar las solicitudes que tengan asignadas y los coord
 
 El sistema debe permitir adjuntar imágenes a una solicitud.
 
-Los formatos permitidos serán PNG y JPG/JPEG, con un tamaño máximo de 5 MB por archivo.
+Se admitirán imágenes reconocidas por Pillow, incluyendo los formatos HEIC/HEIF mediante pillow-heif. El tamaño máximo del archivo original será de 10 MB. Las imágenes se convertirán a WebP antes de almacenarse.
 
 **Criterio de aceptación:** Dada una solicitud que admite adjuntos, cuando el usuario cargue una imagen válida, el sistema deberá almacenarla y asociarla a la solicitud. Si el formato o tamaño no cumple las restricciones, deberá rechazar el archivo.
 
@@ -356,7 +356,7 @@ Los técnicos que no estén asignados a la solicitud no podrán acceder a su con
 
 El sistema debe permitir adjuntar imágenes a los mensajes de la conversación.
 
-Se permitirán archivos PNG y JPG/JPEG, con un tamaño máximo de 5 MB por archivo.
+Se admitirán imágenes reconocidas por Pillow, incluyendo los formatos HEIC/HEIF mediante pillow-heif. El tamaño máximo del archivo original será de 10 MB. Las imágenes se convertirán a WebP antes de almacenarse.
 
 **Criterio de aceptación:** Dado un mensaje que admite adjuntos, cuando el participante cargue una imagen válida, el sistema deberá asociarla al mensaje. Los archivos que incumplan las restricciones serán rechazados.
 
@@ -373,14 +373,14 @@ Antes de almacenar la imagen, el sistema deberá:
 - Corregir la orientación cuando contenga información EXIF.
 - Redimensionar las imágenes que superen las dimensiones máximas de 1920 × 1920 píxeles, conservando su proporción.
 - Convertir las imágenes al formato WebP con una calidad del 80 %.
-- Almacenar el archivo convertido en un espacio privado de Supabase Storage.
+- Almacenar el archivo convertido en el sistema de archivos local del backend, dentro de `apps/backend/storage/`.
 - Registrar sus metadatos y asociarlo con la solicitud, la intervención y el técnico que realizó la carga.
 
 Solo el técnico que tenga una asignación activa podrá adjuntar imágenes a sus intervenciones. No se permitirá realizar esta operación sobre solicitudes cerradas.
 
 Si ocurre un error al registrar los metadatos en la base de datos después de almacenar la imagen, el sistema intentará eliminar el archivo almacenado para evitar archivos huérfanos.
 
-**Criterio de aceptación:** Dada una intervención perteneciente a una solicitud abierta y asignada al técnico autenticado, cuando este adjunte una imagen válida de hasta 10 MB, el sistema deberá validarla, convertirla a WebP y almacenarla en Supabase Storage, conservando su asociación con la intervención y la solicitud. Los archivos inválidos, superiores al límite establecido o enviados por usuarios sin autorización deberán ser rechazados.
+**Criterio de aceptación:** Dada una intervención perteneciente a una solicitud abierta y asignada al técnico autenticado, cuando este adjunte una imagen válida de hasta 10 MB, el sistema deberá validarla, convertirla a WebP y almacenarla en el sistema de archivos local del backend, conservando su asociación con la intervención y la solicitud. Los archivos inválidos, superiores al límite establecido o enviados por usuarios sin autorización deberán ser rechazados.
 
 **RF-26. Historial de conversación**  
 **Prioridad:** M
@@ -470,7 +470,7 @@ El sistema debe permitir al coordinador consultar estadísticas básicas sobre l
 
 **RN-27.** Los técnicos que no estén asignados a una solicitud no podrán consultar sus mensajes ni sus intervenciones internas.
 
-**RN-28.** Los adjuntos de solicitudes y mensajes deberán ser imágenes en formato PNG o JPG/JPEG y no podrán superar los 5 MB por archivo. Los adjuntos de intervenciones técnicas se regirán por las condiciones específicas establecidas en RF-25.
+**RN-28.** Los adjuntos de solicitudes, mensajes e intervenciones técnicas deberán corresponder a imágenes reconocidas por Pillow, incluyendo HEIC/HEIF mediante pillow-heif. El tamaño máximo del archivo original será de 10 MB. Las imágenes se convertirán a WebP antes de almacenarse.
 
 **RN-29.** El sistema no enviará mensajes por correo electrónico, mensajes de texto ni otros servicios externos. Las comunicaciones y los avisos se realizarán dentro de la plataforma.
 
@@ -645,7 +645,7 @@ El sistema no enviará correos electrónicos ni mensajes de texto. Toda la comun
 
 **S-09.** Los usuarios utilizarán la plataforma para enviar y consultar los mensajes relacionados con sus solicitudes.
 
-**S-10.** Los adjuntos de solicitudes y mensajes serán imágenes PNG o JPG/JPEG que no superen los 5 MB por archivo. Los adjuntos de intervenciones técnicas seguirán las condiciones establecidas en RF-25.
+**S-10.** Los adjuntos de solicitudes, mensajes e intervenciones técnicas deberán corresponder a imágenes reconocidas por Pillow, incluyendo HEIC/HEIF mediante pillow-heif. El tamaño máximo del archivo original será de 10 MB. Las imágenes se convertirán a WebP antes de almacenarse.
 
 **S-11.** La placa o identificador del equipo podrá no existir para solicitudes que no estén relacionadas con un equipo identificable.
 
@@ -653,7 +653,7 @@ El sistema no enviará correos electrónicos ni mensajes de texto. Toda la comun
 
 **S-12.** El backend se desarrollará con FastAPI.
 
-**S-13.** La base de datos será PostgreSQL mediante Supabase.
+**S-13.** La aplicación utilizará PostgreSQL como sistema gestor de base de datos. En el entorno de desarrollo local, la instancia se ejecutará localmente.
 
 **S-14.** La primera versión utilizará una API REST para la comunicación entre el frontend y el backend.
 

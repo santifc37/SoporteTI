@@ -3,7 +3,7 @@
 **Versión:** 1.3  
 **Estado:** Modelo de datos revisado; reglas de integridad repartidas entre base de datos y backend  
 **Proyecto:** SoporteTI  
-**Base de datos:** PostgreSQL (Supabase)
+**Base de datos:** PostgreSQL local
 
 Este modelo desarrolla la sección 6 de `docs/diseno.md` y es coherente con `docs/requisitos.md` y `docs/contrato-api.md`. Si hay diferencias, este documento refleja la decisión más reciente del equipo.
 
@@ -210,7 +210,7 @@ Estas reglas no se ven en el diagrama. Se reparten así:
 - **Base de datos (§3.1):** solo las reglas baratas y estables, que protegen la integridad aunque el backend tenga un error. Están en las migraciones `0001_esquema_inicial` y `0002_restricciones_integridad`.
 - **Backend (§3.2):** las reglas de negocio y las que pueden cambiar. Se validan en los esquemas Pydantic y en los servicios, con los códigos de error de `contrato-api.md`.
 
-Como RLS está activado en todas las tablas, solo el backend escribe en la base de datos. Por eso las reglas del backend no se pueden saltar desde la API de Supabase.
+Las tablas tienen habilitado Row Level Security (RLS) mediante la migración inicial, como medida de protección frente al acceso directo desde APIs externas. No se han definido políticas RLS; por tanto, la autorización de las operaciones de negocio se realiza en el backend mediante las sesiones y validaciones de permisos correspondientes. La conexión del backend a PostgreSQL utiliza las credenciales configuradas en el entorno local.
 
 ### 3.1. En la base de datos
 

@@ -28,7 +28,7 @@ Se utilizará una arquitectura cliente-servidor organizada en tres capas:
 
 1. **Presentación:** interfaz web utilizada por solicitantes, técnicos y coordinadores.
 2. **Lógica de negocio:** backend encargado de procesar solicitudes, validar permisos y ejecutar las reglas del sistema.
-3. **Datos:** base de datos y almacenamiento de archivos administrados mediante Supabase.
+3. **Datos:** base de datos PostgreSQL y almacenamiento local de archivos.
 
 ### 3.1. Componentes principales
 
@@ -37,8 +37,8 @@ Se utilizará una arquitectura cliente-servidor organizada en tres capas:
 | Frontend | React + TypeScript | Presentar la interfaz y permitir la interacción de los usuarios. |
 | Backend | Python + FastAPI | Exponer la API, validar permisos y ejecutar las reglas de negocio. |
 | Base de datos | PostgreSQL | Almacenar usuarios, solicitudes, mensajes, intervenciones e historial. |
-| Plataforma de base de datos | Supabase | Proporcionar la infraestructura de PostgreSQL. |
-| Almacenamiento de archivos | Supabase Storage | Conservar las imágenes adjuntas. |
+| Plataforma de base de datos | PostgreSQL local | Proporcionar la persistencia de datos en el entorno de desarrollo. |
+| Almacenamiento de archivos | Disco local | Conservar los archivos adjuntos en el servidor. |
 | Control de versiones | Git + GitHub | Mantener el código y facilitar el trabajo colaborativo. |
 
 ### 3.2. Diagrama de arquitectura
@@ -48,8 +48,8 @@ flowchart TD
     U["Usuarios: solicitante, técnico y coordinador"]
     F["Frontend - React + TypeScript"]
     A["Backend - FastAPI"]
-    D[("Supabase PostgreSQL")]
-    S["Supabase Storage"]
+    D[("PostgreSQL local")]
+    S["Almacenamiento local"]
 
     U --> F
     F -->|"HTTPS / API REST"| A
@@ -64,10 +64,10 @@ flowchart TD
 3. Las operaciones se envían al backend mediante solicitudes HTTP.
 4. FastAPI valida la sesión, los permisos y las reglas de negocio.
 5. El backend consulta o modifica la información en PostgreSQL.
-6. Cuando se requiere almacenar una imagen, el backend valida el archivo y gestiona su almacenamiento en Supabase Storage.
+6. Cuando se requiere almacenar una imagen, el backend valida el archivo y gestiona su almacenamiento en el disco local.
 7. El resultado de cada operación se devuelve al frontend.
 
-El frontend no realizará consultas directas a las tablas de la aplicación ni tendrá acceso a credenciales administrativas de Supabase.
+El frontend no realizará consultas directas a las tablas de la aplicación ni tendrá acceso a credenciales administrativas de la base de datos.
 
 ## 4. Tecnologías seleccionadas
 
@@ -79,7 +79,7 @@ El frontend no realizará consultas directas a las tablas de la aplicación ni t
 | TypeScript | Tipado estático del frontend. |
 | Tailwind CSS | Estilos y diseño de la interfaz. |
 | PostgreSQL | Base de datos relacional. |
-| Supabase | Administración de PostgreSQL y almacenamiento de archivos. |
+| PostgreSQL local | Persistencia de los datos de la aplicación. |
 | SQLAlchemy | Mapeo objeto-relacional. |
 | Alembic | Control de migraciones de la base de datos. |
 | Pydantic | Validación de datos en el backend. |
@@ -229,7 +229,7 @@ La API deberá validar los parámetros de paginación y limitar la cantidad máx
 
 ## 6. Diseño de la base de datos
 
-Se utilizará PostgreSQL mediante Supabase.
+Se utilizará PostgreSQL en el entorno local de desarrollo.
 
 La base de datos será relacional y estará organizada para mantener la integridad de la información, evitar duplicidad innecesaria y permitir consultar el historial de atención de cada solicitud.
 
@@ -410,7 +410,7 @@ Campos propuestos:
 - `mensaje_id`: mensaje asociado, si corresponde.
 - `intervencion_id`: intervención asociada, si corresponde.
 - `nombre_archivo`: nombre original del archivo.
-- `ruta_storage`: ubicación del archivo en Supabase Storage.
+- `ruta_storage`: ruta relativa del archivo dentro de apps/backend/storage/.
 - `tipo_archivo`: formato del archivo.
 - `tamano`: tamaño del archivo en bytes.
 - `subido_por`: usuario que carga el archivo.
@@ -418,7 +418,7 @@ Campos propuestos:
 
 Cada adjunto deberá estar asociado a una solicitud y, opcionalmente, a un mensaje o intervención. Se establecerán restricciones para evitar asociaciones ambiguas.
 
-El archivo físico se almacenará en Supabase Storage. PostgreSQL conservará únicamente sus metadatos y su ruta.
+El archivo físico se almacenará en el disco local, dentro de apps/backend/storage/. PostgreSQL conservará únicamente sus metadatos y su ruta.
 
 #### 6.1.11. notificaciones
 
@@ -734,9 +734,9 @@ Reglas principales:
 
 Ocultar botones en el frontend no será considerado una medida de seguridad suficiente. Los permisos deberán comprobarse en el backend.
 
-## 10. Integración con Supabase
+## 10. Conexión con PostgreSQL local
 
-Supabase será utilizado para administrar PostgreSQL y almacenar archivos.
+PostgreSQL será utilizado como sistema de gestión de base de datos. Los archivos adjuntos se almacenarán localmente.
 
 ### 10.1. Conexión con PostgreSQL
 
@@ -748,10 +748,10 @@ Alembic será utilizado para gestionar las migraciones de la base de datos.
 
 ### 10.2. Responsabilidades
 
-**Supabase:**
-- Administración de PostgreSQL.
-- Infraestructura de almacenamiento.
-- Gestión de buckets y archivos.
+**PostgreSQL:**
+- Persistencia y consulta de los datos de la aplicación.
+
+
 - Herramientas de administración de la base de datos.
 
 **FastAPI:**
@@ -765,7 +765,7 @@ Alembic será utilizado para gestionar las migraciones de la base de datos.
 
 ### 10.3. Protección de credenciales
 
-Las credenciales de conexión y las claves privadas de Supabase permanecerán exclusivamente en el backend.
+Las credenciales de conexión a PostgreSQL permanecerán exclusivamente en el backend.
 
 No se expondrán al frontend claves administrativas ni cadenas de conexión.
 
@@ -773,14 +773,14 @@ Se utilizarán variables de entorno para almacenar:
 
 - URL o cadena de conexión de PostgreSQL.
 - Credenciales de acceso a la base de datos.
-- Credenciales privadas necesarias para Storage.
+
 - Claves de firma de sesiones.
 
 El archivo `.env` no se subirá al repositorio. Se proporcionará un `.env.example` sin credenciales reales para documentar las variables necesarias.
 
 ## 11. Almacenamiento de archivos e imágenes
 
-Los archivos adjuntos se almacenarán en Supabase Storage utilizando un bucket privado.
+Los archivos adjuntos se almacenarán en el disco local del servidor, dentro de apps/backend/storage/.
 
 La base de datos conservará los metadatos y la ubicación de los archivos, no su contenido binario.
 
@@ -788,8 +788,9 @@ La base de datos conservará los metadatos y la ubicación de los archivos, no s
 
 Para la primera versión se establecerán las siguientes condiciones:
 
-- Formatos permitidos: PNG y JPG/JPEG.
-- Tamaño máximo: 5 MB por archivo.
+- Formatos de entrada: imágenes compatibles con Pillow, incluyendo formatos como PNG, JPEG y HEIF/HEIC.
+- Tamaño máximo de entrada: 10 MB por archivo.
+- Formato de almacenamiento: WebP.
 - Los archivos deberán corresponder realmente a imágenes válidas.
 - Los archivos se asociarán a una solicitud y, cuando corresponda, a un mensaje o intervención.
 
@@ -810,7 +811,7 @@ Se utilizarán nombres únicos para los archivos almacenados, evitando sobrescri
 
 ### 11.3. Almacenamiento y acceso
 
-Los archivos se guardarán en un bucket privado de Supabase Storage.
+Los archivos se guardarán en el almacenamiento local del backend.
 
 No se habilitará el acceso público directo a los adjuntos.
 
@@ -824,9 +825,9 @@ Cerrar una solicitud no eliminará las imágenes ni los documentos asociados.
 
 Los archivos se conservarán como parte del historial y de las evidencias de atención de la solicitud.
 
-La eliminación de archivos deberá ser una operación controlada que compruebe los permisos y mantenga la integridad entre Storage y PostgreSQL.
+La eliminación de archivos deberá ser una operación controlada que compruebe los permisos y mantenga la integridad entre el almacenamiento local y PostgreSQL.
 
-La conversión a WebP, el redimensionamiento automático y la limpieza automatizada de archivos huérfanos se consideran mejoras posteriores, no condiciones para completar los flujos principales de la primera versión.
+Las imágenes se convierten a WebP antes de almacenarse. El servicio aplica una corrección de orientación basada en metadatos EXIF y redimensiona las imágenes para que no superen 1920 × 1920 píxeles. La limpieza automatizada de archivos huérfanos queda como mejora posterior.
 
 ## 12. Comunicación y notificaciones
 
@@ -1047,7 +1048,7 @@ Se verificará el funcionamiento conjunto de:
 - Asignación de técnicos.
 - Registro de mensajes e intervenciones.
 - Solicitudes y respuestas de información adicional.
-- Gestión de archivos en Supabase Storage.
+- Gestión de archivos en almacenamiento local.
 - Registro de cambios en el historial.
 - Restricciones de acceso a conversaciones.
 - Gestión de sesiones.
@@ -1099,10 +1100,9 @@ El desarrollo se organizará por flujos funcionales completos. Cada flujo deber�
 
 Después de completar los flujos principales, se podrán incorporar las funcionalidades complementarias que permita el tiempo disponible, como:
 
-- Adjuntos en mensajes e intervenciones.
 - Notificaciones dentro de la plataforma.
 - Actualizaciones de conversación en tiempo real.
-- Conversión de imágenes a WebP.
+- Limpieza automatizada de archivos huérfanos.
 - Mejoras de estadísticas.
 - Funciones adicionales de mantenimiento.
 
@@ -1131,14 +1131,11 @@ Se mantendrán las convenciones y acuerdos establecidos en `docs/guia-desarrollo
 Las siguientes funcionalidades no son necesarias para completar los flujos principales de la primera versión y podrán evaluarse posteriormente:
 
 1. Comunicación en tiempo real mediante WebSockets.
-2. Conversión y optimización de imágenes a WebP.
-3. Redimensionamiento automático de imágenes.
-4. Envío de notificaciones por correo electrónico u otros servicios externos.
-5. Políticas RLS adicionales, si la arquitectura de acceso las requiere.
-6. Automatización de respaldos y recuperación.
-7. Limpieza automatizada de archivos huérfanos.
-8. Mejoras de estadísticas e informes.
-9. Despliegue y automatización avanzada del entorno de producción.
+2. Limpieza automatizada de archivos huérfanos.
+3. Políticas de seguridad adicionales, si la arquitectura de acceso las requiere.
+4. Automatización de respaldos y recuperación.
+5. Mejoras de estadísticas e informes.
+6. Despliegue y automatización avanzada del entorno de producción.
 
 Estas mejoras no deberán retrasar la implementación de los criterios de aceptación principales.
 
