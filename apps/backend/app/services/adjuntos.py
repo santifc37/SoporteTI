@@ -1,25 +1,18 @@
 
 import io
-import logging
-import os
 import uuid
 import warnings
 from pathlib import Path
-from urllib.parse import quote
 
-import httpx
 from fastapi import UploadFile
 from PIL import Image, ImageOps, UnidentifiedImageError
 from pillow_heif import register_heif_opener
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core import config
 from app.core.errors import ApiError
 from app.models import Adjunto, Asignacion, Intervencion, Solicitud
 
-
-logger = logging.getLogger(__name__)
 
 register_heif_opener()
 
@@ -34,7 +27,58 @@ class ErrorImagen(Exception):
 
 
 class ErrorStorage(Exception):
-    """Error al comunicarse con Supabase Storage."""
+    """Error al guardar, leer o eliminar archivos locales."""
+
+
+def _storage_root() -> Path:
+    return (Path(__file__).resolve().parents[2] / "storage").resolve()
+
+
+def _resolver_ruta_storage(ruta: str) -> Path:
+    if not ruta or "\x00" in ruta:
+        raise ErrorStorage("La ruta del archivo no es vÃ¡lida.")
+    relativa = Path(ruta)
+    if relativa.is_absolute():
+        raise ErrorStorage("La ruta del archivo no es vÃ¡lida.")
+    raiz = _storage_root()
+    destino = (raiz / relativa).resolve()
+    try:
+        destino.relative_to(raiz)
+    except ValueError as error:
+        raise ErrorStorage("La ruta del archivo no es vÃ¡lida.") from error
+    return destino
+
+
+def subir_a_storage(ruta: str, contenido: bytes) -> None:
+    destino = _resolver_ruta_storage(ruta)
+    try:
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        with destino.open("xb") as archivo:
+            archivo.write(contenido)
+    except FileExistsError as error:
+        raise ErrorStorage("Ya existe un archivo con esa ruta.") from error
+    except OSError as error:
+        try:
+            destino.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise ErrorStorage("No fue posible guardar el archivo localmente.") from error
+
+
+def leer_de_storage(ruta: str) -> bytes:
+    destino = _resolver_ruta_storage(ruta)
+    try:
+        return destino.read_bytes()
+    except OSError as error:
+        raise ErrorStorage("No fue posible recuperar el archivo local.") from error
+
+
+def eliminar_de_storage(ruta: str) -> None:
+    destino = _resolver_ruta_storage(ruta)
+    try:
+        destino.unlink(missing_ok=True)
+    except OSError as error:
+        raise ErrorStorage("No fue posible eliminar el archivo local.") from error
 
 
 def convertir_a_webp(contenido: bytes) -> bytes:
@@ -94,207 +138,6 @@ def crear_ruta_storage(
         f"solicitudes/{solicitud_id}/"
         f"intervenciones/{intervencion_id}/{uuid.uuid4()}.webp"
     )
-
-
-def _obtener_configuracion_storage() -> tuple[str, str, str]:
-    """Obtiene las credenciales de Supabase Storage."""
-
-    supabase_url = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
-    service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
-    bucket = os.getenv("SUPABASE_STORAGE_BUCKET", "").strip()
-
-    if not supabase_url or not service_role_key or not bucket:
-        raise ErrorStorage(
-            "Falta configurar SUPABASE_URL, "
-            "SUPABASE_SERVICE_ROLE_KEY o SUPABASE_STORAGE_BUCKET."
-        )
-
-    return supabase_url, service_role_key, bucket
-
-
-def _registrar_error_supabase(
-    operacion: str,
-    error: httpx.HTTPStatusError,
-) -> None:
-    """Registra errores HTTP sin exponer credenciales."""
-
-    respuesta = error.response
-    detalle = (respuesta.text or "").strip()
-
-    if len(detalle) > 1500:
-        detalle = detalle[:1500] + "... (respuesta truncada)"
-
-    logger.error(
-        "Supabase Storage rechazó la operación '%s'. "
-        "Código HTTP: %s. Respuesta: %s",
-        operacion,
-        respuesta.status_code,
-        detalle or "(sin detalle)",
-    )
-
-
-def subir_a_storage(ruta: str, contenido: bytes) -> None:
-    """Sube una imagen WebP al bucket privado."""
-
-    supabase_url, service_role_key, bucket = (
-        _obtener_configuracion_storage()
-    )
-
-    ruta_codificada = quote(ruta, safe="/")
-    bucket_codificado = quote(bucket, safe="")
-
-    url = (
-        f"{supabase_url}/storage/v1/object/"
-        f"{bucket_codificado}/{ruta_codificada}"
-    )
-
-    headers = {
-        "Authorization": f"Bearer {service_role_key}",
-        "apikey": service_role_key,
-        "Content-Type": TIPO_WEBP,
-        "x-upsert": "false",
-    }
-
-    try:
-        respuesta = httpx.post(
-            url,
-            headers=headers,
-            content=contenido,
-            timeout=30.0,
-        )
-        respuesta.raise_for_status()
-
-    except httpx.HTTPStatusError as error:
-        _registrar_error_supabase("subida de imagen", error)
-        raise ErrorStorage(
-            f"Supabase Storage respondió HTTP {error.response.status_code}."
-        ) from error
-
-    except httpx.RequestError as error:
-        logger.error(
-            "Error de conexión con Supabase Storage al subir: %s",
-            type(error).__name__,
-        )
-        raise ErrorStorage(
-            "No fue posible conectar con Supabase Storage."
-        ) from error
-
-
-def crear_url_firmada(
-    ruta: str,
-    expiracion_segundos: int = 3600,
-) -> str:
-    """
-    Genera una URL temporal para consultar una imagen privada.
-    La URL tendrá una validez predeterminada de una hora.
-    """
-
-    supabase_url, service_role_key, bucket = (
-        _obtener_configuracion_storage()
-    )
-
-    ruta_codificada = quote(ruta, safe="/")
-    bucket_codificado = quote(bucket, safe="")
-
-    url = (
-        f"{supabase_url}/storage/v1/object/sign/"
-        f"{bucket_codificado}/{ruta_codificada}"
-    )
-
-    headers = {
-        "Authorization": f"Bearer {service_role_key}",
-        "apikey": service_role_key,
-        "Content-Type": "application/json",
-    }
-
-    try:
-        respuesta = httpx.post(
-            url,
-            headers=headers,
-            json={"expiresIn": expiracion_segundos},
-            timeout=30.0,
-        )
-        respuesta.raise_for_status()
-
-        datos = respuesta.json()
-        url_firmada = datos.get("signedURL")
-
-        if not url_firmada:
-            raise ErrorStorage(
-                "Supabase no devolvió una URL firmada."
-            )
-
-        if url_firmada.startswith("http://") or url_firmada.startswith(
-            "https://"
-        ):
-            return url_firmada
-
-        if url_firmada.startswith("/storage/v1/"):
-            return f"{supabase_url}{url_firmada}"
-
-        if url_firmada.startswith("/"):
-            return f"{supabase_url}/storage/v1{url_firmada}"
-
-        return f"{supabase_url}/storage/v1/{url_firmada}"
-
-    except httpx.HTTPStatusError as error:
-        _registrar_error_supabase("generación de URL firmada", error)
-        raise ErrorStorage(
-            "No fue posible generar el enlace de la imagen."
-        ) from error
-
-    except httpx.RequestError as error:
-        logger.error(
-            "Error de conexión con Supabase Storage al generar URL: %s",
-            type(error).__name__,
-        )
-        raise ErrorStorage(
-            "No fue posible conectar con Supabase Storage."
-        ) from error
-
-
-def eliminar_de_storage(ruta: str) -> None:
-    """Elimina una imagen de Storage."""
-
-    supabase_url, service_role_key, bucket = (
-        _obtener_configuracion_storage()
-    )
-
-    ruta_codificada = quote(ruta, safe="/")
-    bucket_codificado = quote(bucket, safe="")
-
-    url = (
-        f"{supabase_url}/storage/v1/object/"
-        f"{bucket_codificado}/{ruta_codificada}"
-    )
-
-    headers = {
-        "Authorization": f"Bearer {service_role_key}",
-        "apikey": service_role_key,
-    }
-
-    try:
-        respuesta = httpx.delete(
-            url,
-            headers=headers,
-            timeout=30.0,
-        )
-        respuesta.raise_for_status()
-
-    except httpx.HTTPStatusError as error:
-        _registrar_error_supabase("eliminación de imagen", error)
-        raise ErrorStorage(
-            "No fue posible eliminar la imagen de Supabase Storage."
-        ) from error
-
-    except httpx.RequestError as error:
-        logger.error(
-            "Error de conexión con Supabase Storage al eliminar: %s",
-            type(error).__name__,
-        )
-        raise ErrorStorage(
-            "No fue posible conectar con Supabase Storage."
-        ) from error
 
 
 def registrar_adjunto(

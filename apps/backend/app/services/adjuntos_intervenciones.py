@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import ApiError
 from app.models import Adjunto
-from app.services.adjuntos import crear_url_firmada
 from app.services.intervenciones import consultar_intervenciones
 
 
@@ -59,7 +58,7 @@ def consultar_adjuntos_intervencion(
             "tipo_archivo": adjunto.tipo_archivo,
             "tamano": adjunto.tamano,
             "fecha_subida": adjunto.fecha_subida,
-            "url": crear_url_firmada(adjunto.ruta_storage),
+            "url": f"/api/v1/attachments/{adjunto.id}/download",
         }
         for adjunto in adjuntos
     ]

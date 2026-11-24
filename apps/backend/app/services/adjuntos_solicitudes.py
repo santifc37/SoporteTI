@@ -1,9 +1,7 @@
 
 import uuid
 from pathlib import Path
-from urllib.parse import quote
 
-import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -14,10 +12,10 @@ from app.services.adjuntos import (
     TIPO_WEBP,
     ErrorImagen,
     ErrorStorage,
-    _obtener_configuracion_storage,
     convertir_a_webp,
     eliminar_de_storage,
     subir_a_storage,
+    leer_de_storage,
 )
 
 
@@ -171,52 +169,30 @@ def descargar_adjunto(
     usuario_id: uuid.UUID,
     rol: str,
 ) -> tuple[Adjunto, bytes]:
-    """Valida permisos y obtiene el archivo privado desde Supabase Storage."""
-
+    """Valida permisos y obtiene el archivo privado desde disco local."""
     adjunto = db.get(Adjunto, adjunto_id)
-
     if adjunto is None:
-        raise ApiError(
-            404,
-            "ADJUNTO_NO_ENCONTRADO",
-            "El archivo indicado no existe.",
+        raise ApiError(404, "ADJUNTO_NO_ENCONTRADO", "El archivo indicado no existe.")
+
+    if adjunto.intervencion_id is not None:
+        from app.services.intervenciones import consultar_intervenciones
+        visibles = consultar_intervenciones(
+            db=db,
+            solicitud_id=adjunto.solicitud_id,
+            usuario_id=usuario_id,
+            rol=rol,
+        )
+        if not any(item["id"] == adjunto.intervencion_id for item in visibles):
+            raise ApiError(404, "ADJUNTO_NO_ENCONTRADO", "El archivo no existe o no tienes permiso para consultarlo.")
+    elif adjunto.mensaje_id is not None:
+        from app.services.mensajes import _solicitud_accesible
+        _solicitud_accesible(db, adjunto.solicitud_id, usuario_id, rol)
+    else:
+        _obtener_solicitud_autorizada(
+            db=db,
+            solicitud_id=adjunto.solicitud_id,
+            usuario_id=usuario_id,
+            rol=rol,
         )
 
-    _obtener_solicitud_autorizada(
-        db=db,
-        solicitud_id=adjunto.solicitud_id,
-        usuario_id=usuario_id,
-        rol=rol,
-    )
-
-    supabase_url, service_role_key, bucket = (
-        _obtener_configuracion_storage()
-    )
-
-    ruta_codificada = quote(adjunto.ruta_storage, safe="/")
-    bucket_codificado = quote(bucket, safe="")
-
-    url = (
-        f"{supabase_url}/storage/v1/object/"
-        f"{bucket_codificado}/{ruta_codificada}"
-    )
-
-    headers = {
-        "Authorization": f"Bearer {service_role_key}",
-        "apikey": service_role_key,
-    }
-
-    try:
-        respuesta = httpx.get(
-            url,
-            headers=headers,
-            timeout=30.0,
-        )
-        respuesta.raise_for_status()
-
-    except httpx.HTTPError as error:
-        raise ErrorStorage(
-            "No fue posible recuperar el archivo de Supabase Storage."
-        ) from error
-
-    return adjunto, respuesta.content
+    return adjunto, leer_de_storage(adjunto.ruta_storage)

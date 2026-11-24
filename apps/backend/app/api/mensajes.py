@@ -16,10 +16,6 @@ from app.schemas.mensajes import (
     MensajeEnviadoRespuesta,
     MensajesLista,
 )
-from app.services.adjuntos import (
-    ErrorStorage,
-    crear_url_firmada,
-)
 from app.services.adjuntos_mensajes import (
     consultar_adjuntos_mensaje,
     registrar_adjunto_mensaje,
@@ -144,29 +140,18 @@ def obtener_adjuntos_mensaje(
         rol=usuario.rol,
     )
 
-    data = []
-
-    for adjunto in adjuntos:
-        try:
-            url = crear_url_firmada(adjunto.ruta_storage)
-        except ErrorStorage as error:
-            raise ApiError(
-                502,
-                "ERROR_OBTENER_IMAGEN",
-                "No fue posible obtener la imagen adjunta.",
-            ) from error
-
-        data.append(
-            {
-                "id": adjunto.id,
-                "mensaje_id": adjunto.mensaje_id,
-                "nombre_archivo": adjunto.nombre_archivo,
-                "tipo_archivo": adjunto.tipo_archivo,
-                "tamano": adjunto.tamano,
-                "subido_por": adjunto.subido_por,
-                "fecha_subida": adjunto.fecha_subida,
-                "url": url,
-            }
-        )
+    data = [
+        {
+            "id": adjunto.id,
+            "mensaje_id": adjunto.mensaje_id,
+            "nombre_archivo": adjunto.nombre_archivo,
+            "tipo_archivo": adjunto.tipo_archivo,
+            "tamano": adjunto.tamano,
+            "subido_por": adjunto.subido_por,
+            "fecha_subida": adjunto.fecha_subida,
+            "url": f"/api/v1/attachments/{adjunto.id}/download",
+        }
+        for adjunto in adjuntos
+    ]
 
     return {"data": data}

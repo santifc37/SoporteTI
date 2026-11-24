@@ -9,3 +9,5 @@ venv/
 # Archivos generados por Python
 __pycache__/
 *.pyc
+# Archivos privados almacenados localmente
+storage/
