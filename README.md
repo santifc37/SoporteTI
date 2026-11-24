@@ -307,19 +307,19 @@ $env:APP_ENV = "local"
 Ejemplo de creación de un usuario coordinador:
 
 ```powershell
-python -m scripts.crear_usuario Admin Local admin.local@soporteti.com coordinador
+python -m scripts.crear_usuario Admin Local coordinador@coordinador.com coordinador
 ```
 
 Ejemplo de creación de un técnico:
 
 ```powershell
-python -m scripts.crear_usuario Tecnico Local tecnico.local@soporteti.com tecnico
+python -m scripts.crear_usuario Tecnico Local tecnico@tecnico.com tecnico
 ```
 
 Ejemplo de creación de un solicitante:
 
 ```powershell
-python -m scripts.crear_usuario Solicitante Local solicitante.local@soporteti.com solicitante
+python -m scripts.crear_usuario Solicitante Local solicitante@solicitante.com solicitante
 ```
 
 El script solicita la contraseña de forma interactiva y la almacena utilizando el mecanismo de hash definido por el backend.
